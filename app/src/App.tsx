@@ -264,12 +264,12 @@ export default function App() {
         : p
     );
 
-  const confirm = async () => {
+  const confirm = async (force = false) => {
     if (!plan) return;
     setBusy(true);
     setError(null);
     try {
-      const r = await api.executePlan(plan);
+      const r = await api.executePlan(plan, force);
       setReport(r);
       // Whatever moved is gone; re-read rather than trusting what we had.
       api.listApps(true).then(setApps);
@@ -489,7 +489,8 @@ export default function App() {
           expert={expert}
           onToggle={toggleItem}
           onCancel={closeSheet}
-          onConfirm={confirm}
+          onConfirm={() => confirm(false)}
+          onForce={() => confirm(true)}
         />
       )}
     </div>

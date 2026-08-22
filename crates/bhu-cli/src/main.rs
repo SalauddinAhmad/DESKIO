@@ -58,6 +58,7 @@ fn usage() {
 
   --json                   machine-readable output
   --sound                  play the Finder trash sound while removing
+  --force                  sweep the files even if the app's own uninstaller fails
 "
     );
 }
@@ -471,6 +472,7 @@ fn cmd_remove(query: Option<&str>, args: &[String]) {
 
     let opts = RemovalOptions {
         sound: args.iter().any(|a| a == "--sound") || bhu_core::settings::load().removal_sound,
+        force: args.iter().any(|a| a == "--force"),
     };
     let report = removal::execute(&plan, opts);
     println!(

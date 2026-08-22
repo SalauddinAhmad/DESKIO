@@ -88,20 +88,27 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
     // failed or cancelled uninstaller would leave the system describing
     // software that is half gone — worse than not having started.
     if let Some(command) = &plan.delegated_command {
-        if let Err(e) = run_delegated(command) {
-            return RemovalReport {
-                outcomes: plan
-                    .selected_items()
-                    .map(|i| RemovalOutcome {
-                        path: i.path.clone(),
-                        removed: false,
-                        trashed_to: None,
-                        error: Some(e.clone()),
-                    })
-                    .collect(),
-                bytes_freed: 0,
-                undo_id: None,
-            };
+        let verify = plan.app.as_ref().and_then(|a| a.path.clone());
+        if let Err(e) = run_delegated(command, verify.as_deref()) {
+            if opts.force {
+                // Explicitly asked for: the uninstaller is broken or refuses to
+                // run, and clearing the files is all that is left.
+            } else {
+                return RemovalReport {
+                    delegated_failed: Some(e.clone()),
+                    outcomes: plan
+                        .selected_items()
+                        .map(|i| RemovalOutcome {
+                            path: i.path.clone(),
+                            removed: false,
+                            trashed_to: None,
+                            error: Some(e.clone()),
+                        })
+                        .collect(),
+                    bytes_freed: 0,
+                    undo_id: None,
+                };
+            }
         }
     }
 
@@ -189,6 +196,7 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
         outcomes,
         bytes_freed,
         undo_id: None,
+        delegated_failed: None,
     };
     report.undo_id = undo::record(&report, plan.app.as_ref().map(|a| a.name.clone()));
     report
@@ -198,35 +206,97 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
 ///
 /// NOT YET EXERCISED — there is no delegated uninstall on macOS, so this path
 /// only runs on Windows and Linux and has not been tried on either.
-fn run_delegated(command: &str) -> Result<(), String> {
+#[cfg(not(target_os = "windows"))]
+fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), String> {
     use std::process::Command;
-
-    #[cfg(target_os = "windows")]
-    let mut cmd = {
-        let mut c = Command::new("cmd");
-        c.args(["/C", command]);
-        c
-    };
-    #[cfg(not(target_os = "windows"))]
-    let mut cmd = {
-        let mut c = Command::new("/bin/sh");
-        c.args(["-c", command]);
-        c
-    };
-
-    let status = cmd
+    let _ = verify;
+    let status = Command::new("/bin/sh")
+        .args(["-c", command])
         .status()
         .map_err(|e| format!("could not start the uninstaller: {e}"))?;
     if status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "the application's own uninstaller did not finish (exit {}). Nothing else was removed.",
-            status
-                .code()
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| "unknown".into())
-        ))
+        return Ok(());
+    }
+    Err(format!(
+        "the application's own uninstaller did not finish (exit {}).",
+        status
+            .code()
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "unknown".into())
+    ))
+}
+
+/// Run a Windows uninstaller, elevated, and wait for it.
+///
+/// NOT YET RUN ON WINDOWS.
+///
+/// Two things this has to get right. An uninstaller in `Program Files` needs
+/// administrator rights: started without them it either fails outright, or
+/// re-launches itself elevated and returns immediately — so the caller sees an
+/// exit code that has nothing to do with the real outcome. That is what the
+/// first Windows attempt hit: "exit 1" from an uninstaller that had not
+/// actually run. Starting it elevated avoids both.
+///
+/// And the command comes out of the registry carrying its own quoting, so it is
+/// written to a `.cmd` file and that file is run. Re-quoting someone else's
+/// command line is how this goes wrong.
+#[cfg(target_os = "windows")]
+fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), String> {
+    use std::io::Write;
+    use std::process::Command;
+
+    let work = std::env::temp_dir().join(format!("BHUninstaller-uninstall-{}", std::process::id()));
+    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+    let script = work.join("run.cmd");
+    {
+        let mut f = std::fs::File::create(&script).map_err(|e| e.to_string())?;
+        // Written verbatim; nothing re-quotes it.
+        write!(f, "@echo off\r\n{command}\r\nexit /b %ERRORLEVEL%\r\n")
+            .map_err(|e| e.to_string())?;
+    }
+
+    let quoted = script.display().to_string().replace('\'', "''");
+    let inner = format!(
+        "$p = Start-Process -FilePath cmd.exe -ArgumentList '/C','{quoted}' -Verb RunAs -Wait -PassThru; exit $p.ExitCode"
+    );
+    let out = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &inner,
+        ])
+        .output()
+        .map_err(|e| format!("could not start the uninstaller: {e}"))?;
+
+    // The exit code is not trustworthy on its own. Inno Setup's `unins000.exe`
+    // — which is what most Windows apps ship — returns 1 both when it hands off
+    // to an elevated copy of itself *and* when the user answers "No" to its own
+    // confirmation. Reading it as failure told the user the uninstaller was
+    // broken when it had simply asked a question.
+    //
+    // So the code is treated as a hint and the outcome is checked: if the
+    // install directory is gone, the uninstall worked, whatever it returned.
+    let code = out.status.code();
+    if matches!(code, Some(0) | Some(3010)) {
+        return Ok(());
+    }
+    if let Some(path) = verify {
+        // Give the uninstaller a moment to finish deleting before looking.
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        if !path.exists() {
+            return Ok(());
+        }
+    }
+    match code {
+        Some(1223) | Some(1602) | Some(1) => {
+            Err("the uninstall was cancelled, or the application is still installed.".into())
+        }
+        Some(code) => Err(format!(
+            "the application's own uninstaller did not finish (exit {code})."
+        )),
+        None => Err("the application's own uninstaller was interrupted.".into()),
     }
 }
 

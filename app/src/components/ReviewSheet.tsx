@@ -18,10 +18,11 @@ interface Props {
   onToggle: (path: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
+  onForce: () => void;
 }
 
 export function ReviewSheet(props: Props) {
-  const { plan, busy, error, report, expert, onToggle, onCancel, onConfirm } = props;
+  const { plan, busy, error, report, expert, onToggle, onCancel, onConfirm, onForce } = props;
   const [showWeak, setShowWeak] = useState(false);
 
   // Low-confidence rows are hidden by default so the list reads as the things
@@ -36,7 +37,9 @@ export function ReviewSheet(props: Props) {
   const anyUnknown = selected.some((i) => i.size_unknown);
   const needsAdmin = selected.some((i) => i.requires_admin);
 
-  if (report) return <ResultView report={report} onClose={onCancel} />;
+  if (report) {
+    return <ResultView report={report} busy={busy} onForce={onForce} onClose={onCancel} />;
+  }
 
   return (
     <div className="sheet-backdrop">
@@ -154,13 +157,22 @@ function Row({
   );
 }
 
-function ResultView({ report, onClose }: { report: RemovalReport; onClose: () => void }) {
+function ResultView({
+  report, busy, onForce, onClose,
+}: {
+  report: RemovalReport;
+  busy: boolean;
+  onForce: () => void;
+  onClose: () => void;
+}) {
   const removed = report.outcomes.filter((o) => o.removed);
   const failed = report.outcomes.filter((o) => !o.removed);
   return (
     <div className="sheet-backdrop">
       <div className="sheet" role="dialog" aria-modal="true">
-        <div className="sheet-title">Removal complete</div>
+        <div className="sheet-title">
+          {report.delegated_failed ? "Nothing was removed" : "Removal complete"}
+        </div>
         <div className="sheet-strip">
           <div>
             <b>{removed.length}</b> <span className="muted">item(s) moved to the Trash</span>
@@ -168,7 +180,19 @@ function ResultView({ report, onClose }: { report: RemovalReport; onClose: () =>
           <b>{humanSize(report.bytes_freed)}</b>
         </div>
         <div className="sheet-body">
-          {failed.length > 0 && (
+          {report.delegated_failed && (
+            <div className="banner" style={{ margin: "4px 4px 12px" }}>
+              <IconWarn />
+              <div>
+                <strong>{report.delegated_failed}</strong>
+                Nothing was touched, because removing an app's files underneath its
+                own half-finished uninstaller usually leaves a worse mess than
+                stopping. If that uninstaller is simply broken, you can clear the
+                files anyway.
+              </div>
+            </div>
+          )}
+          {failed.length > 0 && !report.delegated_failed && (
             <>
               <div className="section-title" style={{ marginTop: 4, fontSize: 15 }}>
                 Not removed
@@ -194,7 +218,12 @@ function ResultView({ report, onClose }: { report: RemovalReport; onClose: () =>
             </p>
           )}
         </div>
-        <div className="sheet-foot" style={{ justifyContent: "flex-end" }}>
+        <div className="sheet-foot" style={{ justifyContent: "flex-end", gap: 10 }}>
+          {report.delegated_failed && (
+            <button className="btn btn-ghost" onClick={onForce} disabled={busy}>
+              {busy ? "Removing…" : "Remove the files anyway"}
+            </button>
+          )}
           <button className="btn btn-primary" onClick={onClose}>Done</button>
         </div>
       </div>

@@ -277,6 +277,13 @@ pub struct RemovalOptions {
     /// Play the Finder trash sound per item. See [`crate::trash_bin`] for what
     /// this actually changes — it is not only a sound.
     pub sound: bool,
+    /// Sweep the files even if the application's own uninstaller failed.
+    ///
+    /// Off by default, because removing files underneath a half-finished
+    /// uninstaller is usually worse than stopping. It exists for the case
+    /// where the uninstaller is simply broken or refuses to run, and the files
+    /// are all that is left to clear.
+    pub force: bool,
 }
 
 /// Result of executing a plan.
@@ -286,6 +293,10 @@ pub struct RemovalReport {
     pub bytes_freed: u64,
     /// Id of the undo journal entry written for this removal.
     pub undo_id: Option<String>,
+    /// Set when the application's own uninstaller failed and the sweep was
+    /// abandoned. The interface uses this to offer going ahead anyway.
+    #[serde(default)]
+    pub delegated_failed: Option<String>,
 }
 
 impl RemovalReport {

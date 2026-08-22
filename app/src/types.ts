@@ -77,6 +77,8 @@ export interface RemovalReport {
   outcomes: RemovalOutcome[];
   bytes_freed: number;
   undo_id: string | null;
+  /** Set when the app's own uninstaller failed and the sweep was abandoned. */
+  delegated_failed: string | null;
 }
 
 export type StartupKind =

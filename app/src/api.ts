@@ -76,13 +76,13 @@ export const api = {
     return call("plan_orphans", { names });
   },
 
-  async executePlan(plan: RemovalPlan): Promise<RemovalReport> {
+  async executePlan(plan: RemovalPlan, force = false): Promise<RemovalReport> {
     if (!IS_TAURI) {
       throw new Error(
         "Running in a browser without the engine — nothing can be removed here."
       );
     }
-    return call("execute_plan", { plan });
+    return call("execute_plan", { plan, force });
   },
 
   async startupItems(refresh = false): Promise<StartupItem[]> {

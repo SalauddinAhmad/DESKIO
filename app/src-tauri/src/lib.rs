@@ -141,7 +141,7 @@ fn plan_orphans(names: Vec<String>, cache: State<Cache>) -> RemovalPlan {
 
 /// Carry out a plan. Everything goes to the Trash.
 #[tauri::command]
-fn execute_plan(plan: RemovalPlan, cache: State<Cache>) -> RemovalReport {
+fn execute_plan(plan: RemovalPlan, force: bool, cache: State<Cache>) -> RemovalReport {
     // Nothing is removed that this app did not itself put in front of the user.
     let offered = cache.offered.lock().unwrap().clone();
     let mut plan = plan;
@@ -161,6 +161,7 @@ fn execute_plan(plan: RemovalPlan, cache: State<Cache>) -> RemovalReport {
 
     let opts = RemovalOptions {
         sound: bhu_core::settings::load().removal_sound,
+        force,
     };
     let mut report = removal::execute(&plan, opts);
     report.outcomes.extend(refused);
