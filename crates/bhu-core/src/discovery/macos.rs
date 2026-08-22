@@ -223,9 +223,12 @@ fn icon_png(path: &Path) -> Option<String> {
     // Unique per call: icon extraction runs on several threads at once, and a
     // shared filename would have them overwriting each other's output.
     static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let tmp = std::env::temp_dir().join(format!(
-        "bhu-icon-{}-{}.png",
-        std::process::id(),
+    // A per-process directory, so nothing can pre-place a symlink at a path
+    // `sips` is about to write to.
+    let dir = std::env::temp_dir().join(format!("bhu-icons-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).ok()?;
+    let tmp = dir.join(format!(
+        "icon-{}.png",
         N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     let ok = Command::new("/usr/bin/sips")

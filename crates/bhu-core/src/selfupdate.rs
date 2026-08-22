@@ -253,7 +253,9 @@ pub fn download(release: &Release) -> Result<PathBuf, String> {
         .read_to_vec()
         .map_err(|e| format!("download failed: {e}"))?;
 
-    let dir = std::env::temp_dir().join("BHUninstaller-update");
+    // Per-process, so two runs cannot collide and nothing can pre-place a
+    // symlink at a path we are about to write to.
+    let dir = std::env::temp_dir().join(format!("BHUninstaller-update-{}", std::process::id()));
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     // The name comes from GitHub, so it is not trusted as a path.
     let safe: String = name
@@ -267,7 +269,16 @@ pub fn download(release: &Release) -> Result<PathBuf, String> {
         })
         .collect();
     let path = dir.join(safe);
-    std::fs::write(&path, bytes).map_err(|e| format!("could not save the download: {e}"))?;
+    // `create_new` refuses an existing file — including a symlink — rather than
+    // writing through it.
+    let _ = std::fs::remove_file(&path);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(|e| format!("could not save the download: {e}"))?;
+    std::io::Write::write_all(&mut file, &bytes)
+        .map_err(|e| format!("could not save the download: {e}"))?;
     Ok(path)
 }
 

@@ -276,7 +276,7 @@ fn set_enabled_elevated(
     enabled: bool,
 ) -> Result<(), String> {
     let script = r#"on run argv
-    set cmd to "/bin/launchctl " & (item 1 of argv) & " " & quoted form of (item 2 of argv)
+    set cmd to "/bin/launchctl " & quoted form of (item 1 of argv) & " " & quoted form of (item 2 of argv)
     if (count of argv) > 2 then
         if (item 1 of argv) is "enable" then
             set cmd to cmd & " ; /bin/launchctl bootstrap system " & quoted form of (item 3 of argv)

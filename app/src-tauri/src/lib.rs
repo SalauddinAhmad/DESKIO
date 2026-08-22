@@ -16,7 +16,8 @@ use bhu_core::startup::StartupItem;
 use bhu_core::undo::{RestoreOutcome, UndoEntry};
 use bhu_core::updates::UpdateInfo;
 use bhu_core::{discovery, leftovers, removal};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::State;
 
@@ -31,6 +32,26 @@ struct Cache {
     extensions: Mutex<Vec<ExtensionGroup>>,
     updates: Mutex<Vec<UpdateInfo>>,
     junk: Mutex<Vec<JunkGroup>>,
+    /// Every path the backend has offered up in a plan.
+    ///
+    /// The interface can deselect items but never invent them, so a path
+    /// arriving at `execute_plan` that was never offered did not come from a
+    /// plan this app produced. The engine's blocklist would still refuse
+    /// system and personal paths, but it would happily remove any ordinary
+    /// file — so the plan is checked against what was actually offered rather
+    /// than taken on trust.
+    offered: Mutex<HashSet<PathBuf>>,
+}
+
+impl Cache {
+    /// Record what a plan put in front of the user.
+    fn offer(&self, plan: &RemovalPlan) {
+        let mut offered = self.offered.lock().unwrap();
+        offered.clear();
+        for item in &plan.items {
+            offered.insert(item.path.clone());
+        }
+    }
 }
 
 #[tauri::command]
@@ -82,7 +103,9 @@ fn plan_uninstall(id: String, cache: State<Cache>) -> Option<RemovalPlan> {
     let mut app = app;
     discovery::enrich(&mut app);
     let items = leftovers::for_app(&app, &apps);
-    Some(removal::build_plan(app, items))
+    let plan = removal::build_plan(app, items);
+    cache.offer(&plan);
+    Some(plan)
 }
 
 #[tauri::command]
@@ -109,16 +132,35 @@ fn plan_orphans(names: Vec<String>, cache: State<Cache>) -> RemovalPlan {
     for item in plan.items.iter_mut() {
         item.selected = true;
     }
+    cache.offer(&plan);
     plan
 }
 
 /// Carry out a plan. Everything goes to the Trash.
 #[tauri::command]
 fn execute_plan(plan: RemovalPlan, cache: State<Cache>) -> RemovalReport {
+    // Nothing is removed that this app did not itself put in front of the user.
+    let offered = cache.offered.lock().unwrap().clone();
+    let mut plan = plan;
+    let mut refused: Vec<RemovalOutcome> = Vec::new();
+    plan.items.retain(|item| {
+        if !item.selected || offered.contains(&item.path) {
+            return true;
+        }
+        refused.push(RemovalOutcome {
+            path: item.path.clone(),
+            removed: false,
+            trashed_to: None,
+            error: Some("this was not part of the plan you were shown — refusing".into()),
+        });
+        false
+    });
+
     let opts = RemovalOptions {
         sound: bhu_core::settings::load().removal_sound,
     };
-    let report = removal::execute(&plan, opts);
+    let mut report = removal::execute(&plan, opts);
+    report.outcomes.extend(refused);
     // Whatever just moved is gone from the disk; the caches must not keep
     // claiming otherwise.
     cache.apps.lock().unwrap().clear();
@@ -210,6 +252,7 @@ fn plan_cleanup(ids: Vec<String>, cache: State<Cache>) -> RemovalPlan {
     for item in plan.items.iter_mut() {
         item.selected = true;
     }
+    cache.offer(&plan);
     plan
 }
 

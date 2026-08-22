@@ -12,3 +12,7 @@ app/src/fixtures.json
 # Internal project notes — kept locally, not published. The full development
 # history including this file is on the `internal-history` branch.
 CLAUDE.md
+
+# The finished build. Only ever the latest one; regenerate with
+# scripts/build-release.sh
+dist/

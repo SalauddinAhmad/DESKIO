@@ -21,14 +21,25 @@
         "hiddenTitle": true
       }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    }
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
-    "icon": ["icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "icon": [
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns"
+    ],
     "category": "Utility",
     "shortDescription": "Uninstall apps and clean up what they leave behind.",
-    "macOS": { "minimumSystemVersion": "11.0" }
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
   }
 }

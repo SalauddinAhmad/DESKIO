@@ -468,11 +468,22 @@ mod tests {
 
     #[test]
     fn admin_is_decided_by_real_write_permission() {
-        // System directories the user cannot write to need a password...
-        assert!(requires_admin(Path::new(
-            "/Library/LaunchDaemons/com.example.plist"
-        )));
-        // ...but the user's own Library does not.
-        assert!(!requires_admin(&home().join("Library/Caches/com.example")));
+        // What matters is whether the *containing* directory is writable, so
+        // this uses a directory that genuinely exists on the machine running
+        // the test rather than one that happens to exist on the author's.
+        assert!(
+            !requires_admin(&home().join("bhu-permission-probe")),
+            "a path in the user's own home should not need a password"
+        );
+
+        #[cfg(target_os = "windows")]
+        let system_path = Path::new(r"C:\Windows\System32\bhu-probe");
+        #[cfg(not(target_os = "windows"))]
+        let system_path = Path::new("/usr/lib/bhu-probe");
+
+        assert!(
+            requires_admin(system_path),
+            "a path in a system directory should need a password"
+        );
     }
 }

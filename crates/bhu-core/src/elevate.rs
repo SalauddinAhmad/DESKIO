@@ -14,6 +14,7 @@
 //! everything came from, and the UI must say so rather than implying otherwise.
 
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Ask for an administrator password once and move every path into a quarantine
 /// folder in the user's Trash. Returns the folder it created.
@@ -25,9 +26,35 @@ pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String>
         return Err("nothing to remove".into());
     }
     let home = dirs::home_dir().ok_or("no home directory")?;
-    let dest = home.join(".Trash").join(format!("BHUninstaller {stamp}"));
-    std::fs::create_dir_all(&dest)
-        .map_err(|e| format!("could not prepare {}: {e}", dest.display()))?;
+    let trash = home.join(".Trash");
+    std::fs::create_dir_all(&trash)
+        .map_err(|e| format!("could not prepare {}: {e}", trash.display()))?;
+
+    // The destination has to be a directory this call has just created, not one
+    // that was already sitting there. A predictable name that something else
+    // could pre-place — as a symlink, say — would have `mv`, running as root,
+    // write through it to wherever that link pointed.
+    //
+    // `create_dir` fails outright if the path exists at all, symlink included,
+    // so a collision is refused rather than followed; the suffix makes
+    // arranging one impractical in the first place.
+    let dest = trash.join(format!(
+        "BHUninstaller {stamp} ({}-{})",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0)
+    ));
+    std::fs::create_dir(&dest).map_err(|e| format!("could not prepare {}: {e}", dest.display()))?;
+
+    // Confirm what we just made is a real directory and not something
+    // substituted between the two calls.
+    let meta = std::fs::symlink_metadata(&dest)
+        .map_err(|e| format!("could not verify {}: {e}", dest.display()))?;
+    if meta.is_symlink() || !meta.is_dir() {
+        return Err("the quarantine folder was not what we created — refusing".into());
+    }
 
     // Every path is passed as a separate argument and quoted by AppleScript's
     // `quoted form of`. Nothing is ever interpolated into the shell string —
