@@ -184,3 +184,16 @@ shared — adding a platform means writing adapters, not a second application.
 ## 📄 Licence
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+— BiswasHost · <https://www.biswashost.com>
+
+## ☕ Support
+
+BHUninstaller is free and open-source. If it saved you time, you can **buy me a coffee** — it
+genuinely helps me keep building and maintaining free tools like this. 🙏
+
+- **bKash/Nagad** (Personal · *Send Money*): **`01710378396`**
+
+ধন্যবাদ! / Thank you!
