@@ -1,0 +1,16 @@
+[package]
+name = "bhu-cli"
+description = "Headless CLI over the BHUninstaller engine. Used for testing on any OS."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "bhu"
+path = "src/main.rs"
+
+[dependencies]
+bhu-core = { path = "../bhu-core" }
+serde_json.workspace = true

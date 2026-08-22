@@ -1,0 +1,35 @@
+[package]
+name = "bhu-core"
+description = "BHUninstaller engine: app discovery, leftover scanning, and safe removal."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[features]
+default = ["updates"]
+# The update check is the only part of the engine that touches the network.
+# Keeping it optional means the rest can be built — and cross-compiled — with no
+# TLS stack at all, which is what makes checking the Windows and Linux adapters
+# from a Mac possible.
+updates = ["dep:ureq"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+walkdir.workspace = true
+thiserror.workspace = true
+dirs.workspace = true
+trash.workspace = true
+base64 = "0.22"
+ureq = { version = "3", default-features = false, features = ["rustls"], optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.55"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+plist = "1"

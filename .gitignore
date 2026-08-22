@@ -1,0 +1,14 @@
+target/
+node_modules/
+dist/
+.DS_Store
+*.pkg
+*.dmg
+
+# Captured from a real machine for UI preview — contains the local app list and
+# paths. Regenerate with `scripts/make-fixtures.sh`; never commit it.
+app/src/fixtures.json
+
+# Internal project notes — kept locally, not published. The full development
+# history including this file is on the `internal-history` branch.
+CLAUDE.md

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b8bff"/>
+      <stop offset="0.55" stop-color="#0d6efd"/>
+      <stop offset="1" stop-color="#0948b3"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#bh)"/>
+  <!-- the app: a solid rounded square, intact -->
+  <rect x="286" y="212" width="452" height="326" rx="66" fill="#ffffff"/>
+  <rect x="286" y="212" width="452" height="326" rx="66" fill="none" stroke="#0948b3" stroke-opacity="0.12" stroke-width="8"/>
+  <!-- its leftovers: fragments breaking away underneath, fading out -->
+  <g fill="#ffffff">
+    <rect x="330" y="608" width="364" height="52" rx="26" opacity="0.95"/>
+    <rect x="378" y="700" width="268" height="52" rx="26" opacity="0.66"/>
+    <rect x="430" y="792" width="164" height="52" rx="26" opacity="0.38"/>
+  </g>
+</svg>
