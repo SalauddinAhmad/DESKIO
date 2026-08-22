@@ -7,10 +7,12 @@
 //!
 //! ## Rules this follows
 //!
-//! - **Only GitHub.** The download host must be exactly `github.com` or
-//!   `objects.githubusercontent.com`. A lookalike such as
+//! - **Only GitHub.** The URL taken from the API must be exactly `github.com`
+//!   or `objects.githubusercontent.com` — a lookalike such as
 //!   `github.com.example.net` is rejected, so a tampered API response cannot
-//!   redirect the download somewhere else.
+//!   point the download somewhere else. GitHub itself then redirects to its
+//!   asset CDN, which is followed; the check is on the URL we are *given*, and
+//!   that is the one an attacker would have to control.
 //! - **Numbers, not strings.** `1.10` is newer than `1.9`; string comparison
 //!   says otherwise and would nag forever.
 //! - **Silence on failure.** Being offline is normal. A failed check is never

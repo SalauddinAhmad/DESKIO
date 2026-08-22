@@ -38,8 +38,9 @@ For context when judging severity, these are enforced and tested:
   Downloads, which is deliberately narrow and covered by tests.
 - Paths passed to the privileged helper go through `osascript` **argv** and are
   quoted with `quoted form of`; nothing is interpolated into a shell string.
-- Update downloads are accepted only from `github.com` and
-  `objects.githubusercontent.com`, matched exactly so a lookalike host fails.
+- The download URL taken from the GitHub API must be exactly `github.com` or
+  `objects.githubusercontent.com`, matched so a lookalike host fails. GitHub's
+  own redirect to its asset CDN is followed from there.
 
 ## Supported versions
 
