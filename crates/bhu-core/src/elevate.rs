@@ -96,11 +96,125 @@ end run"#;
     Err(err.trim().to_string())
 }
 
-#[cfg(not(target_os = "macos"))]
+/// Ask for elevation once, and move every path into a quarantine folder.
+///
+/// NOT YET RUN ON WINDOWS. The shape mirrors the macOS path: one prompt, a
+/// move rather than a delete, and a folder the user can open and pick through.
+///
+/// Windows has no supported way to put a file in the Recycle Bin as another
+/// user, so the quarantine lives under `%LOCALAPPDATA%\BHUninstaller\Quarantine`
+/// instead — still the user's own space, still recoverable, and the removal
+/// history records where everything came from.
+///
+/// The paths are written to a file and the elevated script reads them from
+/// there. Building a command line out of them would mean quoting user-supplied
+/// paths for PowerShell, which is exactly the mistake the macOS path avoids by
+/// passing argv.
+#[cfg(target_os = "windows")]
+pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String> {
+    use std::io::Write;
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    if paths.is_empty() {
+        return Err("nothing to remove".into());
+    }
+    let local = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .ok_or("no local application data directory")?;
+
+    let root = local.join("BHUninstaller").join("Quarantine");
+    std::fs::create_dir_all(&root)
+        .map_err(|e| format!("could not prepare {}: {e}", root.display()))?;
+
+    let dest = root.join(format!(
+        "{stamp} ({}-{})",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0)
+    ));
+    // Refuses an existing path, symlink included — see the macOS notes.
+    std::fs::create_dir(&dest).map_err(|e| format!("could not prepare {}: {e}", dest.display()))?;
+
+    let work = std::env::temp_dir().join(format!("BHUninstaller-elevate-{}", std::process::id()));
+    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+
+    let list = work.join("paths.txt");
+    {
+        let mut f = std::fs::File::create(&list).map_err(|e| e.to_string())?;
+        for p in paths {
+            writeln!(f, "{}", p.display()).map_err(|e| e.to_string())?;
+        }
+    }
+
+    let script = work.join("move.ps1");
+    std::fs::write(
+        &script,
+        r#"param([string]$PathsFile, [string]$Dest)
+$ErrorActionPreference = 'Stop'
+New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+foreach ($p in Get-Content -LiteralPath $PathsFile -Encoding UTF8) {
+    if ([string]::IsNullOrWhiteSpace($p)) { continue }
+    if (-not (Test-Path -LiteralPath $p)) { continue }
+    $name   = Split-Path -Leaf $p
+    $target = Join-Path $Dest $name
+    $i = 1
+    while (Test-Path -LiteralPath $target) {
+        $target = Join-Path $Dest ("{0} ({1})" -f $name, $i)
+        $i++
+    }
+    Move-Item -LiteralPath $p -Destination $target -Force
+}
+"#,
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Single-quoted PowerShell strings; a quote inside a path is escaped by
+    // doubling it, which is the only escape that form has.
+    let q = |p: &std::path::Path| p.display().to_string().replace('\'', "''");
+    let inner = format!(
+        "Start-Process powershell -Verb RunAs -Wait -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','{}','-PathsFile','{}','-Dest','{}')",
+        q(&script),
+        q(&list),
+        q(&dest)
+    );
+
+    let out = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &inner,
+        ])
+        .output()
+        .map_err(|e| format!("could not start PowerShell: {e}"))?;
+
+    if out.status.success() {
+        return Ok(dest);
+    }
+    let err = String::from_utf8_lossy(&out.stderr);
+    let _ = std::fs::remove_dir(&dest);
+    // Declining the UAC prompt is a choice, not a fault to report as one.
+    if err.contains("canceled")
+        || err.contains("cancelled")
+        || err.contains("The operation was canceled by the user")
+    {
+        return Err("cancelled".into());
+    }
+    Err(if err.trim().is_empty() {
+        "the elevated removal did not complete".into()
+    } else {
+        err.trim().to_string()
+    })
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
 pub fn trash_elevated(_paths: &[PathBuf], _stamp: &str) -> Result<PathBuf, String> {
-    // Windows: re-launch the removal helper with a UAC elevation prompt.
-    // Linux: pkexec, or delegate to the package manager which handles its own
-    // privilege escalation.
+    // Linux: pkexec, or leave it to the package manager, which handles its own
+    // privilege escalation as part of the uninstall.
     Err("elevated removal is not implemented on this platform yet".into())
 }
 

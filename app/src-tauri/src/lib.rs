@@ -102,8 +102,11 @@ fn plan_uninstall(id: String, cache: State<Cache>) -> Option<RemovalPlan> {
     let app = apps.iter().find(|a| a.id == id)?.clone();
     let mut app = app;
     discovery::enrich(&mut app);
-    let items = leftovers::for_app(&app, &apps);
-    let plan = removal::build_plan(app, items);
+    // Goes through the engine's own planner rather than assembling a plan here:
+    // that is what attaches the platform's uninstall command. Building it
+    // by hand meant Windows never ran the vendor's uninstaller and tried to
+    // delete Program Files itself instead.
+    let plan = bhu_core::plan_uninstall(&app, &apps);
     cache.offer(&plan);
     Some(plan)
 }
@@ -369,6 +372,78 @@ fn download_app_update(release: Release) -> Result<String, String> {
     bhu_core::selfupdate::download(&release).map(|p| p.to_string_lossy().to_string())
 }
 
+/// Start the downloaded installer and close BHUninstaller.
+///
+/// The app has to be gone before an installer can replace it — on Windows the
+/// installer simply refuses while it is running — so this launches it and then
+/// exits rather than leaving the user to work that out.
+///
+/// The path is not taken on trust even though it came from `download_app_update`
+/// a moment earlier: it must still be inside the download directory this
+/// process created, and carry an installer extension. Running an arbitrary
+/// path handed over from the interface is not something to leave open.
+#[tauri::command]
+fn install_update(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let path = PathBuf::from(&path);
+    let expected_parent =
+        std::env::temp_dir().join(format!("BHUninstaller-update-{}", std::process::id()));
+    if path.parent() != Some(expected_parent.as_path()) {
+        return Err("that file was not downloaded by this app — refusing to run it".into());
+    }
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default();
+    if !matches!(ext.as_str(), "dmg" | "pkg" | "msi" | "exe" | "deb" | "rpm") {
+        return Err(format!("{ext} is not an installer — refusing to run it"));
+    }
+    if !path.is_file() {
+        return Err("the download is no longer there".into());
+    }
+
+    let mut command = installer_command(&path, &ext);
+    command
+        .spawn()
+        .map_err(|e| format!("could not start the installer: {e}"))?;
+
+    // Give it a moment to appear before this window disappears, so the user
+    // does not watch the app vanish with nothing yet on screen.
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        handle.exit(0);
+    });
+    Ok(())
+}
+
+fn installer_command(path: &std::path::Path, ext: &str) -> std::process::Command {
+    #[cfg(target_os = "windows")]
+    {
+        // An .msi is data, not a program: it needs msiexec to run it.
+        if ext == "msi" {
+            let mut c = std::process::Command::new("msiexec");
+            c.arg("/i").arg(path);
+            return c;
+        }
+        return std::process::Command::new(path);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = ext;
+        let mut c = std::process::Command::new("/usr/bin/open");
+        c.arg(path);
+        c
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = ext;
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(path);
+        c
+    }
+}
+
 #[tauri::command]
 fn engine_version() -> String {
     bhu_core::VERSION.to_string()
@@ -404,6 +479,7 @@ pub fn run() {
             engine_version,
             check_app_update,
             download_app_update,
+            install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running BHUninstaller");

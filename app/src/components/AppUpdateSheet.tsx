@@ -28,7 +28,7 @@ export function AppUpdateSheet({ check, onClose }: Props) {
     try {
       const path = await api.downloadAppUpdate(release);
       setSaved(path);
-      await api.openPath(path);
+      await api.installUpdate(path);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -69,11 +69,9 @@ export function AppUpdateSheet({ check, onClose }: Props) {
             <div className="banner" style={{ margin: "16px 0 0", color: "var(--ok)" }}>
               <IconCheck />
               <div>
-                <strong>Downloaded</strong>
-                {saved}
-                <br />
-                Opening it now — install it as you would any other download, then
-                relaunch.
+                <strong>Downloaded — starting the installer</strong>
+                BHUninstaller will close in a moment so the installer can replace it.
+                Reopen it when the install finishes.
               </div>
             </div>
           )}
@@ -99,7 +97,7 @@ export function AppUpdateSheet({ check, onClose }: Props) {
               onClick={download}
               disabled={busy || !release.asset_url || !!saved}
             >
-              {busy ? "Downloading…" : "Download"}
+              {busy ? "Downloading…" : saved ? "Installing…" : "Download and install"}
             </button>
           </div>
         </div>

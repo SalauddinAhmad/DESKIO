@@ -18,7 +18,7 @@ export const IconTrash = () => (
 );
 
 export const IconWarn = () => (
-  <svg viewBox="0 0 24 24" {...s} style={{ width: 16, height: 16, flex: "0 0 16px", marginTop: 1 }}><path d="M12 4 3 19h18L12 4Z" /><path d="M12 10v4M12 17h.01" /></svg>
+  <svg viewBox="0 0 24 24" {...s}><path d="M12 4 3 19h18L12 4Z" /><path d="M12 10v4M12 17h.01" /></svg>
 );
 
 export const IconFolder = () => (

@@ -257,6 +257,7 @@ button { font: inherit; color: inherit; cursor: default; }
   border-radius: 11px; font-size: 12.5px; color: var(--warn);
   display: flex; gap: 10px; align-items: flex-start;
 }
+.banner svg { width: 16px; height: 16px; flex: 0 0 16px; margin-top: 1px; }
 .banner strong { display: block; color: var(--warn); }
 .banner button { background: none; border: 0; padding: 0; margin-top: 5px;
   color: var(--bh-500); font-weight: 700; font-size: 12.5px; text-decoration: underline; }
@@ -379,3 +380,23 @@ button { font: inherit; color: inherit; cursor: default; }
   border: 3px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(107, 124, 147, .5); background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- smaller windows ---------- */
+
+/* The default window is 1180x780. Windows machines are often shorter than
+   that once the taskbar and title bar are taken out, which left the sheets
+   with their footers pressed against the bottom edge. */
+@media (max-height: 800px) {
+  .sheet-backdrop { padding: 14px; }
+  .release-notes { max-height: 140px; }
+  .list-head { padding-top: 26px; }
+  .hero { padding: 16px 18px; }
+  .hero-icon, .hero-icon img { width: 72px; height: 72px; flex-basis: 72px; }
+  .hero-name { font-size: 19px; }
+  .btn { height: 40px; }
+}
+
+@media (max-width: 1120px) {
+  .list-col { width: 330px; flex: 0 0 330px; }
+  .detail-body, .detail-foot, .detail-top { padding-left: 16px; padding-right: 16px; }
+}

@@ -176,10 +176,12 @@ export const api = {
     return call("download_app_update", { release });
   },
 
-  async openPath(path: string): Promise<void> {
+  /// Start the downloaded installer; the app closes itself so it can be
+  /// replaced. Handled in Rust rather than through the opener plugin, which
+  /// refuses open_path unless it is granted in the capability file.
+  async installUpdate(path: string): Promise<void> {
     if (!IS_TAURI) return;
-    const { openPath } = await import("@tauri-apps/plugin-opener");
-    await openPath(path);
+    return call("install_update", { path });
   },
 
   async getSettings(): Promise<Settings> {
