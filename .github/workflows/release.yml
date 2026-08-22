@@ -8,6 +8,11 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Creating the release and attaching installers to it needs write access to
+# repository contents; the default token is read-only.
+permissions:
+  contents: write
+
 jobs:
   build:
     name: ${{ matrix.name }}
@@ -65,4 +70,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: BHUninstaller ${{ github.ref_name }}
           releaseDraft: true
+          # Without this the Linux job reports "No artifacts were found": the
+          # default glob does not match every bundle tauri produces there.
+          includeUpdaterJson: false
           args: ${{ matrix.args }}
