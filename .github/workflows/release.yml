@@ -41,7 +41,10 @@ jobs:
           - os: ubuntu-latest
             name: Linux
             target: ""
-            args: --bundles deb,appimage
+            # .deb and .rpm are a few megabytes; an AppImage is ~76 MB because
+            # it carries its own copy of GTK and WebKit. Not worth the download
+            # for the same application.
+            args: --bundles deb,rpm
             optional: true
     steps:
       - uses: actions/checkout@v4
