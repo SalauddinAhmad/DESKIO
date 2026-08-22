@@ -96,11 +96,13 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
             } else {
                 return RemovalReport {
                     delegated_failed: Some(e.clone()),
+                    delegated_ran: true,
                     outcomes: plan
                         .selected_items()
                         .map(|i| RemovalOutcome {
                             path: i.path.clone(),
                             removed: false,
+                            already_gone: false,
                             trashed_to: None,
                             error: Some(e.clone()),
                         })
@@ -118,6 +120,7 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
             outcomes.push(RemovalOutcome {
                 path: item.path.clone(),
                 removed: false,
+                already_gone: false,
                 trashed_to: None,
                 error: Some(e.to_string()),
             });
@@ -126,11 +129,16 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
         // `symlink_metadata` so a symlink is examined as itself rather than
         // followed to whatever it points at.
         let Ok(meta) = fs::symlink_metadata(&item.path) else {
+            // Already gone — almost always because the application's own
+            // uninstaller has just removed it. Reporting that as a failure told
+            // the user nothing had been removed when in fact the uninstall had
+            // worked perfectly.
             outcomes.push(RemovalOutcome {
                 path: item.path.clone(),
-                removed: false,
+                removed: true,
+                already_gone: true,
                 trashed_to: None,
-                error: Some("no longer exists".into()),
+                error: None,
             });
             continue;
         };
@@ -151,6 +159,7 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
                 outcomes.push(RemovalOutcome {
                     path: item.path.clone(),
                     removed: true,
+                    already_gone: false,
                     trashed_to,
                     error: None,
                 });
@@ -158,6 +167,7 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
             Err(e) => outcomes.push(RemovalOutcome {
                 path: item.path.clone(),
                 removed: false,
+                already_gone: false,
                 trashed_to: None,
                 error: Some(e.to_string()),
             }),
@@ -174,6 +184,7 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
                     outcomes.push(RemovalOutcome {
                         path,
                         removed: true,
+                        already_gone: false,
                         trashed_to: landed,
                         error: None,
                     });
@@ -184,6 +195,7 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
                     outcomes.push(RemovalOutcome {
                         path,
                         removed: false,
+                        already_gone: false,
                         trashed_to: None,
                         error: Some(e.clone()),
                     });
@@ -197,6 +209,7 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
         bytes_freed,
         undo_id: None,
         delegated_failed: None,
+        delegated_ran: plan.delegated_command.is_some(),
     };
     report.undo_id = undo::record(&report, plan.app.as_ref().map(|a| a.name.clone()));
     report

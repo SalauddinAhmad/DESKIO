@@ -165,7 +165,8 @@ function ResultView({
   onForce: () => void;
   onClose: () => void;
 }) {
-  const removed = report.outcomes.filter((o) => o.removed);
+  const moved = report.outcomes.filter((o) => o.removed && !o.already_gone);
+  const alreadyGone = report.outcomes.filter((o) => o.already_gone);
   const failed = report.outcomes.filter((o) => !o.removed);
   return (
     <div className="sheet-backdrop">
@@ -175,7 +176,13 @@ function ResultView({
         </div>
         <div className="sheet-strip">
           <div>
-            <b>{removed.length}</b> <span className="muted">item(s) moved to the Trash</span>
+            <b>{moved.length}</b> <span className="muted">item(s) moved to the Trash</span>
+            {alreadyGone.length > 0 && (
+              <span className="muted">
+                {" · "}
+                {alreadyGone.length} already removed by the app's own uninstaller
+              </span>
+            )}
           </div>
           <b>{humanSize(report.bytes_freed)}</b>
         </div>
@@ -208,7 +215,16 @@ function ResultView({
               ))}
             </>
           )}
-          {failed.length === 0 && (
+          {failed.length === 0 && report.delegated_ran && !report.delegated_failed && (
+            <p style={{ color: "var(--muted)", padding: "8px 12px" }}>
+              The application's own uninstaller did the main work; anything it left
+              behind was moved to the Trash.
+              <br />
+              <br />
+              Your disk gets the space back when you empty the Trash.
+            </p>
+          )}
+          {failed.length === 0 && !report.delegated_ran && (
             <p style={{ color: "var(--muted)", padding: "8px 12px" }}>
               Everything selected was moved to the Trash. Nothing was deleted — you can
               put it back from the History screen, or from the Trash itself.

@@ -111,6 +111,9 @@ could not read.
 
 ## 🔨 Building
 
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the platform notes, what is
+still unfinished, and the things that cost time to find.
+
 Requires [Rust](https://rustup.rs) and Node 20+.
 
 ```bash

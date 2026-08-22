@@ -261,6 +261,12 @@ impl RemovalPlan {
 pub struct RemovalOutcome {
     pub path: PathBuf,
     pub removed: bool,
+    /// The item was already gone before we got to it — usually because the
+    /// application's own uninstaller had just removed it. That is the outcome
+    /// the user wanted, so it counts as success, but it is reported separately
+    /// rather than claimed as something this app moved.
+    #[serde(default)]
+    pub already_gone: bool,
     /// Where the item ended up in the trash, when that could be determined.
     /// This is what makes putting it back possible without Finder's help.
     #[serde(default)]
@@ -297,11 +303,23 @@ pub struct RemovalReport {
     /// abandoned. The interface uses this to offer going ahead anyway.
     #[serde(default)]
     pub delegated_failed: Option<String>,
+    /// The application's own uninstaller ran and finished. Worth saying: most
+    /// of the work was its, and what this app removed was the leftovers.
+    #[serde(default)]
+    pub delegated_ran: bool,
 }
 
 impl RemovalReport {
     pub fn removed_count(&self) -> usize {
-        self.outcomes.iter().filter(|o| o.removed).count()
+        self.outcomes
+            .iter()
+            .filter(|o| o.removed && !o.already_gone)
+            .count()
+    }
+
+    /// Items that had already been removed by something else.
+    pub fn already_gone_count(&self) -> usize {
+        self.outcomes.iter().filter(|o| o.already_gone).count()
     }
     pub fn failed(&self) -> impl Iterator<Item = &RemovalOutcome> {
         self.outcomes.iter().filter(|o| !o.removed)

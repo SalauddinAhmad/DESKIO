@@ -153,6 +153,7 @@ fn execute_plan(plan: RemovalPlan, force: bool, cache: State<Cache>) -> RemovalR
         refused.push(RemovalOutcome {
             path: item.path.clone(),
             removed: false,
+            already_gone: false,
             trashed_to: None,
             error: Some("this was not part of the plan you were shown — refusing".into()),
         });

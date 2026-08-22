@@ -70,6 +70,7 @@ export interface OrphanGroup {
 export interface RemovalOutcome {
   path: string;
   removed: boolean;
+  already_gone: boolean;
   error: string | null;
 }
 
@@ -79,6 +80,8 @@ export interface RemovalReport {
   undo_id: string | null;
   /** Set when the app's own uninstaller failed and the sweep was abandoned. */
   delegated_failed: string | null;
+  /** The app's own uninstaller ran and finished. */
+  delegated_ran: boolean;
 }
 
 export type StartupKind =
