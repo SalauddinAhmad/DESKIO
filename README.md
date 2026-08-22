@@ -1,24 +1,34 @@
-# BHUninstaller
+# BHUninstaller — uninstall apps properly, and clean up what they leave behind
 
-Uninstall applications properly — and find what previous uninstalls left behind.
+A native app uninstaller and leftover cleaner by **BiswasHost** — a free
+alternative to App Cleaner & Uninstaller / Revo Uninstaller. One Rust engine and
+one interface across macOS, Windows and Linux: uninstall with a full leftover
+sweep, manage startup items and extensions, clear caches and build junk, see
+which apps have updates, and put any removal back. 100% open-source.
 
-One engine, three platforms. Free and MIT-licensed, by
-[BiswasHost](https://biswashost.com).
+**Available for:**
+
+| Platform | Status |
+|----------|--------|
+| 🍎 **macOS** | ✅ **Stable** — Apple Silicon + Intel |
+| 🪟 **Windows** | 🟡 **Written, untested** — compiles in CI, never run |
+| 🐧 **Linux** | 🟡 **Written, untested** — compiles in CI, never run |
+
+> 🟢 Runs the author's daily Mac. Nothing is ever deleted — every removal moves
+> to the Trash, behind a review sheet showing every path and why it matched.
 
 ![Applications](docs/screenshots/applications.png)
 
-> **Status — macOS works and is in daily use by its author. Windows and Linux
-> are not finished.** Their adapters are written and compile for their targets,
-> but have never been *run* there. See [Platform support](#platform-support).
+---
 
-## Why
+## ✨ Why
 
 Dragging an app to the Trash leaves its preferences, caches, containers, launch
 agents and support folders exactly where they were — often gigabytes of them,
 for software removed years ago. Windows and Linux have the same problem in
 different folders. BHUninstaller finds those files and removes them safely.
 
-## Nothing is deleted, and nothing happens unseen
+## 🛡️ Nothing is deleted, and nothing happens unseen
 
 Every removal produces a plan first. Every line in it carries its full path, its
 size, and **the reason the engine thinks it belongs to the app** — evidence you
@@ -41,7 +51,7 @@ Five rules the whole app is built around:
    your Documents, Desktop and Downloads are refused at the moment of removal,
    whatever the plan says.
 
-## What it does
+## 📦 What it does
 
 | | |
 |---|---|
@@ -60,7 +70,7 @@ Five rules the whole app is built around:
   <img src="docs/screenshots/history.png" width="49%" alt="History" />
 </p>
 
-## Deliberate limits
+## 🚧 Deliberate limits
 
 Things it could do and does not, each for a reason:
 
@@ -75,7 +85,7 @@ Things it could do and does not, each for a reason:
   screen and the optional check for a newer BHUninstaller, both of which look up
   public version numbers and say nothing about you.
 
-## Platform support
+## 💻 Platform support
 
 | | Discovery | Leftovers | Startup | Extensions | Cleanup | Status |
 |---|---|---|---|---|---|---|
@@ -88,7 +98,7 @@ their real targets in CI, so they compile and their types are right. Nobody has
 executed them yet. Treat those builds as untested: run `bhu list` and
 `bhu plan <app>` first, which change nothing, before trusting a removal.
 
-## Full Disk Access (macOS)
+## 🔓 Full Disk Access (macOS)
 
 macOS keeps parts of `~/Library` behind Full Disk Access, and an app cannot ask
 for that permission — only point at System Settings. BHUninstaller explains the
@@ -99,7 +109,7 @@ Without it the app still works. It reports unreadable folders as *size unknown*
 rather than pretending they are empty, and never offers to remove something it
 could not read.
 
-## Building
+## 🔨 Building
 
 Requires [Rust](https://rustup.rs) and Node 20+.
 
@@ -127,7 +137,7 @@ npm run dev
 The snapshot lists everything installed on the machine that produced it, so it
 is deliberately not committed.
 
-## The CLI
+## ⌨️ The CLI
 
 The engine ships with a headless driver — useful for checking its judgement
 before trusting a UI with it, and the only way to use it on a server.
@@ -151,7 +161,7 @@ bhu remove "Some App" --yes # carry it out (everything goes to the Trash)
 `bhu plan` never changes anything, and `bhu remove` without `--yes` is also a dry
 run. Add `--json` to any command for machine-readable output.
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 crates/bhu-core     the engine — discovery, matching, safety, removal, undo
@@ -171,6 +181,6 @@ Everything platform-specific lives in the adapter files. The safety rules, the
 matching logic, planning, removal, the undo journal and the whole interface are
 shared — adding a platform means writing adapters, not a second application.
 
-## Licence
+## 📄 Licence
 
 MIT. See [LICENSE](LICENSE).

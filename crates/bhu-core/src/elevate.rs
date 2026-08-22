@@ -14,13 +14,13 @@
 //! everything came from, and the UI must say so rather than implying otherwise.
 
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Ask for an administrator password once and move every path into a quarantine
 /// folder in the user's Trash. Returns the folder it created.
 #[cfg(target_os = "macos")]
 pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String> {
     use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     if paths.is_empty() {
         return Err("nothing to remove".into());
