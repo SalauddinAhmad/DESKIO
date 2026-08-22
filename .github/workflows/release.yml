@@ -17,6 +17,7 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -29,14 +30,19 @@ jobs:
             name: macOS (Intel)
             target: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
+          # These two build, but have never been run on their own platform —
+          # see the README. They are allowed to fail so a macOS release still
+          # ships; verifying them is a job for someone with the hardware.
           - os: windows-latest
             name: Windows
             target: ""
-            args: ""
+            args: --bundles msi,nsis
+            optional: true
           - os: ubuntu-latest
             name: Linux
             target: ""
-            args: ""
+            args: --bundles deb,appimage
+            optional: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
