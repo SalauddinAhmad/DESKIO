@@ -113,3 +113,37 @@ jobs:
               || true
           fi
           gh release upload "$TAG" "${files[@]}" --clobber
+
+  # Only the newest release is kept. Older ones are deleted along with their
+  # tags, so the releases page never accumulates builds nobody should be
+  # downloading — and the updater only ever has one answer to give.
+  prune:
+    name: Remove older releases
+    needs: build
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete every release but the newest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Never prune unless the release being built actually exists and has
+          # something attached; deleting the old ones after a failed build
+          # would leave nothing to download at all.
+          count=$(gh release view "$KEEP" --repo "$GITHUB_REPOSITORY" \
+                    --json assets -q '.assets | length' 2>/dev/null || echo 0)
+          if [ "$count" -lt 1 ]; then
+            echo "::warning::$KEEP has no assets — keeping the older releases"
+            exit 0
+          fi
+
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+            --json tagName -q '.[].tagName' \
+          | while read -r tag; do
+              [ "$tag" = "$KEEP" ] && continue
+              echo "removing $tag"
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+            done
