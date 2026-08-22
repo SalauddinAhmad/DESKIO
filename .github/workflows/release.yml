@@ -62,15 +62,43 @@ jobs:
       - run: npm ci
         working-directory: app
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build
+        working-directory: app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: app
-          tagName: ${{ github.ref_name }}
-          releaseName: BHUninstaller ${{ github.ref_name }}
-          releaseDraft: true
-          # Without this the Linux job reports "No artifacts were found": the
-          # default glob does not match every bundle tauri produces there.
-          includeUpdaterJson: false
-          args: ${{ matrix.args }}
+          # Ad-hoc sign the app *during* bundling, before the disk image is
+          # made. Signing afterwards is too late — and leaving it unsigned
+          # makes macOS report a downloaded build as "damaged" rather than
+          # merely unverified.
+          APPLE_SIGNING_IDENTITY: ${{ matrix.os == 'macos-latest' && '-' || '' }}
+        run: npm run tauri build -- ${{ matrix.args }}
+
+      # tauri-action could not collect the Windows and Linux bundles even
+      # though it had just built them, so the installers are gathered and
+      # uploaded directly. Predictable, and easy to see what went where.
+      - name: Attach installers to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find target -type f \
+            \( -name '*.dmg' -o -name '*.msi' -o -name '*-setup.exe' \
+               -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) \
+            -not -name '*.sig' | sort)
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no installers were produced"
+            find target -maxdepth 4 -type d -name bundle -exec find {} -type f \; | head -40
+            exit 1
+          fi
+
+          printf 'found:\n'; printf '  %s\n' "${files[@]}"
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft \
+              --title "BHUninstaller $TAG" \
+              --notes "See the README for what is in this release. macOS builds are ad-hoc signed, not notarised: open with right-click → Open the first time." \
+              || true
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
