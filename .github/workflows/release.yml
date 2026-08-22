@@ -82,7 +82,9 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          mapfile -t files < <(find target -type f \
+          # `mapfile` does not exist in the bash 3.2 that ships with macOS.
+          files=()
+          while IFS= read -r f; do files+=("$f"); done < <(find target -type f \
             \( -name '*.dmg' -o -name '*.msi' -o -name '*-setup.exe' \
                -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) \
             -not -name '*.sig' | sort)
