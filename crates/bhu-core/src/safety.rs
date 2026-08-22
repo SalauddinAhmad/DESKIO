@@ -382,6 +382,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn allows_real_leftovers() {
         assert!(check_removable(Path::new("/Applications/Free Download Manager.app")).is_ok());
         assert!(check_removable(
@@ -392,7 +393,23 @@ mod tests {
         assert!(check_removable(&home().join("Library/Containers/com.example.app")).is_ok());
     }
 
+    /// The same rule stated without any macOS path in it: something a couple of
+    /// levels inside the user's own data directories is removable, wherever
+    /// those directories happen to live.
     #[test]
+    fn allows_a_leftover_inside_the_users_app_data() {
+        #[cfg(target_os = "windows")]
+        let leftover = home().join(r"AppData\Roaming\Acme\Widget");
+        #[cfg(target_os = "linux")]
+        let leftover = home().join(".config/acme-widget");
+        #[cfg(target_os = "macos")]
+        let leftover = home().join("Library/Application Support/Acme");
+
+        assert!(check_removable(&leftover).is_ok());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
     fn allows_installer_receipts_despite_living_under_private_var() {
         assert!(
             check_removable(Path::new("/private/var/db/receipts/com.example.pkg.plist")).is_ok()
