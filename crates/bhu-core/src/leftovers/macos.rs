@@ -153,6 +153,7 @@ fn collect(tokens: &AppTokens) -> (Vec<Leftover>, Vec<String>) {
                             reason: cm.reason,
                             requires_admin: safety::requires_admin(&child),
                             shared_with: Vec::new(),
+                            registry_key: None,
                             name: cname.clone(),
                             path: child,
                         });
@@ -172,6 +173,7 @@ fn collect(tokens: &AppTokens) -> (Vec<Leftover>, Vec<String>) {
                 reason: m.reason,
                 requires_admin: safety::requires_admin(&path),
                 shared_with: Vec::new(),
+                registry_key: None,
                 name: name.clone(),
                 path,
             });
@@ -269,6 +271,7 @@ pub fn orphans(all_apps: &[InstalledApp]) -> Vec<OrphanGroup> {
                 reason: format!("left behind by \"{owner}\", which is no longer installed"),
                 requires_admin: safety::requires_admin(&path),
                 shared_with: Vec::new(),
+                registry_key: None,
                 path,
             };
 

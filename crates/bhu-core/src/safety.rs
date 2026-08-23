@@ -335,12 +335,156 @@ fn is_writable(dir: &Path) -> bool {
     }
 }
 
+/// Registry subtrees that hold entries for the whole system rather than for one
+/// application. Nothing inside them at this level is ever removable.
+const RESERVED_KEYS: &[&str] = &[
+    "classes",
+    "microsoft",
+    "policies",
+    "windows",
+    "clients",
+    "registeredapplications",
+    "wow6432node",
+    "intel",
+    "odbc",
+    "khronos",
+];
+
+/// Check whether a registry key may be removed.
+///
+/// The registry is not a filesystem and a wrong write there is worse than a
+/// wrong file delete: it can leave other software subtly broken with nothing to
+/// point at. So the rule is narrower than for files — only keys that live where
+/// applications keep their own settings are eligible at all:
+///
+/// ```text
+///   HKCU\Software\<Vendor>[\<Product>…]
+///   HKLM\SOFTWARE\<Vendor>[\<Product>…]      (and the WOW6432Node mirror)
+/// ```
+///
+/// Everything else — `SYSTEM`, `SAM`, `HARDWARE`, the hive roots, `Software`
+/// itself, and the shared subtrees above — is refused outright, whatever a plan
+/// claims. As with files, this runs immediately before the key is touched.
+pub fn check_registry_removable(key: &str) -> Result<(), SafetyError> {
+    let as_path = PathBuf::from(key);
+    let deny = |reason: &str| {
+        Err(SafetyError {
+            path: as_path.clone(),
+            reason: reason.to_string(),
+        })
+    };
+
+    if key.trim().is_empty() {
+        return deny("empty registry key");
+    }
+    if key.contains('*') || key.contains('?') {
+        return deny("registry key contains a wildcard");
+    }
+
+    let parts: Vec<&str> = key
+        .split('\\')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
+    if parts.contains(&"..") {
+        return deny("registry key contains a '..' component");
+    }
+    if parts.len() < 3 {
+        return deny("registry key is too shallow to belong to one application");
+    }
+
+    // Only the two hives where applications keep their own settings.
+    let hive = parts[0].to_lowercase();
+    if !matches!(
+        hive.as_str(),
+        "hkcu" | "hkey_current_user" | "hklm" | "hkey_local_machine"
+    ) {
+        return deny("only HKCU and HKLM are ever touched");
+    }
+    if !parts[1].eq_ignore_ascii_case("software") {
+        return deny("only keys under Software are ever touched");
+    }
+
+    // The 32-bit mirror is the same namespace one level down.
+    let mut rest = &parts[2..];
+    if rest
+        .first()
+        .map(|p| p.eq_ignore_ascii_case("wow6432node"))
+        .unwrap_or(false)
+    {
+        rest = &rest[1..];
+    }
+    let Some(first) = rest.first() else {
+        return deny("this is a shared registry root, not an application's key");
+    };
+    if RESERVED_KEYS.contains(&first.to_lowercase().as_str()) {
+        return deny(&format!(
+            "Software\\{first} holds entries for the whole system"
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn home() -> PathBuf {
         dirs::home_dir().expect("home dir")
+    }
+
+    #[test]
+    fn registry_refuses_everything_outside_an_application_area() {
+        for key in [
+            "",
+            "HKCU",
+            "HKCU\\Software",
+            "HKLM\\SOFTWARE",
+            "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip",
+            "HKCR\\.txt",
+            "HKEY_USERS\\S-1-5-21\\Software\\Foo",
+            "HKCU\\Software\\*",
+            "HKCU\\Software\\..\\..\\SYSTEM",
+        ] {
+            assert!(
+                check_registry_removable(key).is_err(),
+                "should have refused {key}"
+            );
+        }
+    }
+
+    #[test]
+    fn registry_refuses_the_shared_subtrees() {
+        for key in [
+            "HKCU\\Software\\Microsoft",
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            "HKCU\\Software\\Classes",
+            "HKLM\\SOFTWARE\\Policies\\Microsoft",
+            "HKLM\\SOFTWARE\\WOW6432Node",
+            "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Office",
+            "HKCU\\Software\\RegisteredApplications",
+        ] {
+            assert!(
+                check_registry_removable(key).is_err(),
+                "should have refused {key}"
+            );
+        }
+    }
+
+    #[test]
+    fn registry_allows_an_application_s_own_key() {
+        for key in [
+            "HKCU\\Software\\Softdeluxe\\Free Download Manager",
+            "HKCU\\Software\\FreeDownloadManager",
+            "HKLM\\SOFTWARE\\VS Revo Group\\Revo Uninstaller Pro",
+            "HKLM\\SOFTWARE\\WOW6432Node\\Acme\\Widget",
+            "HKEY_CURRENT_USER\\Software\\Acme\\Widget\\Settings",
+        ] {
+            assert!(
+                check_registry_removable(key).is_ok(),
+                "should have allowed {key}"
+            );
+        }
     }
 
     #[test]

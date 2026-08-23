@@ -73,7 +73,12 @@ and have not been confirmed working:
 
 - `elevate.rs` — the elevated quarantine under `%LOCALAPPDATA%\BHUninstaller\Quarantine`
 - `removal.rs::run_delegated` — running an uninstaller with administrator rights
-- registry leftovers are not implemented at all; only files are scanned
+- **registry leftovers** — scanning, exporting and deleting keys, and the
+  elevated batch for `HKLM`. Read the safety rules in `safety.rs`
+  (`check_registry_removable`) before changing anything here: only
+  `HK{CU,LM}\Software\<Vendor>…` is ever eligible, shared subtrees are refused
+  outright, and a key is never deleted unless its `.reg` export was written
+  first — that export is the only undo a registry key has.
 
 ## Things that cost time to find
 

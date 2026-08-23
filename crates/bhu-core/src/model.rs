@@ -144,6 +144,7 @@ pub enum LeftoverKind {
     WebData,
     Receipt,
     Extension,
+    RegistryKey,
     CrashReport,
     Other,
 }
@@ -165,6 +166,7 @@ impl LeftoverKind {
             LeftoverKind::WebData => "Web Data",
             LeftoverKind::Receipt => "Installer Receipt",
             LeftoverKind::Extension => "Extension",
+            LeftoverKind::RegistryKey => "Registry Key",
             LeftoverKind::CrashReport => "Crash Report",
             LeftoverKind::Other => "Other",
         }
@@ -197,6 +199,12 @@ pub struct Leftover {
     /// a shared vendor directory. Such items are never pre-selected and the UI
     /// warns about them explicitly.
     pub shared_with: Vec<String>,
+    /// Set when this is a registry key rather than a file, e.g.
+    /// `HKCU\Software\Vendor\Product`. A key cannot go to the Recycle Bin, so
+    /// removal exports it to a `.reg` file first — that export *is* its undo.
+    /// When this is set, `path` carries the same string for display only.
+    #[serde(default)]
+    pub registry_key: Option<String>,
 }
 
 /// One line of a removal plan: an app bundle, a leftover, or a delegated
@@ -214,6 +222,9 @@ pub struct RemovalItem {
     pub requires_admin: bool,
     /// Whether this item is ticked. Defaults to `confidence.preselected()`.
     pub selected: bool,
+    /// Set when this is a registry key rather than a file. See [`Leftover`].
+    #[serde(default)]
+    pub registry_key: Option<String>,
 }
 
 impl From<Leftover> for RemovalItem {
@@ -229,6 +240,7 @@ impl From<Leftover> for RemovalItem {
             confidence: l.confidence,
             reason: l.reason,
             requires_admin: l.requires_admin,
+            registry_key: l.registry_key,
         }
     }
 }

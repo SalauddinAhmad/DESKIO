@@ -7,7 +7,7 @@ export type LeftoverKind =
   | "preferences" | "caches" | "application_support" | "container"
   | "group_container" | "logs" | "saved_state" | "launch_agent"
   | "launch_daemon" | "privileged_helper" | "cookies" | "web_data"
-  | "receipt" | "extension" | "crash_report" | "other";
+  | "receipt" | "extension" | "crash_report" | "registry_key" | "other";
 
 export interface InstalledApp {
   id: string;
@@ -42,6 +42,8 @@ export interface RemovalItem {
   reason: string;
   requires_admin: boolean;
   selected: boolean;
+  /** Set when this is a registry key rather than a file. */
+  registry_key: string | null;
 }
 
 export interface RemovalPlan {
@@ -61,6 +63,7 @@ export interface Leftover {
   reason: string;
   requires_admin: boolean;
   shared_with: string[];
+  registry_key: string | null;
 }
 
 export interface OrphanGroup {

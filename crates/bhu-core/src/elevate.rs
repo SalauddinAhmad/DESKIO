@@ -220,3 +220,98 @@ pub fn trash_elevated(_paths: &[PathBuf], _stamp: &str) -> Result<PathBuf, Strin
 pub fn needs_elevation(path: &Path) -> bool {
     crate::safety::requires_admin(path)
 }
+
+/// Export and delete machine-wide registry keys, with one prompt for the lot.
+///
+/// Same shape as the elevated file move: the keys are written to a list rather
+/// than interpolated into a command line, and the elevated script reads that
+/// list. A key that fails to export is skipped rather than deleted — the export
+/// is its only undo.
+#[cfg(target_os = "windows")]
+pub fn registry_remove_elevated(keys: &[(String, PathBuf)]) -> Result<(), String> {
+    use std::io::Write;
+
+    if keys.is_empty() {
+        return Err("nothing to remove".into());
+    }
+    // Refuse the whole batch if any single key would not pass the rules. An
+    // elevated operation is the wrong place to be lenient.
+    for (key, _) in keys {
+        crate::safety::check_registry_removable(key).map_err(|e| e.to_string())?;
+    }
+
+    let work = std::env::temp_dir().join(format!("BHUninstaller-registry-{}", std::process::id()));
+    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+
+    // key<TAB>backup-file, one per line, UTF-8.
+    let list = work.join("keys.txt");
+    {
+        let mut f = std::fs::File::create(&list).map_err(|e| e.to_string())?;
+        for (key, backup) in keys {
+            writeln!(f, "{}\t{}", key, backup.display()).map_err(|e| e.to_string())?;
+        }
+    }
+
+    let done = work.join("done.txt");
+    let script = work.join("registry.ps1");
+    std::fs::write(
+        &script,
+        r#"$ErrorActionPreference='SilentlyContinue'
+$list = $args[0]
+$done = $args[1]
+$ok = 0
+foreach ($line in Get-Content -LiteralPath $list -Encoding UTF8) {
+  if ($line -notmatch "`t") { continue }
+  $parts = $line -split "`t", 2
+  $key = $parts[0]
+  $backup = $parts[1]
+  # Export first. Without a usable backup the key is left exactly as it is.
+  & reg.exe export "$key" "$backup" /y | Out-Null
+  if (-not (Test-Path -LiteralPath $backup)) { continue }
+  if ((Get-Item -LiteralPath $backup).Length -le 0) { continue }
+  & reg.exe delete "$key" /f | Out-Null
+  if ($LASTEXITCODE -eq 0) { $ok++ }
+}
+Set-Content -LiteralPath $done -Value $ok -Encoding UTF8
+"#,
+    )
+    .map_err(|e| e.to_string())?;
+
+    let status = crate::proc::command("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+        ])
+        .arg(format!(
+            "$p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList \
+             '-NoProfile','-ExecutionPolicy','Bypass','-File','{}','{}','{}'; exit $p.ExitCode",
+            script.display(),
+            list.display(),
+            done.display()
+        ))
+        .output()
+        .map_err(|e| format!("could not start the elevated helper: {e}"))?;
+
+    let removed = std::fs::read_to_string(&done)
+        .ok()
+        .and_then(|s| s.trim().parse::<usize>().ok())
+        .unwrap_or(0);
+    let _ = std::fs::remove_dir_all(&work);
+
+    if removed > 0 {
+        return Ok(());
+    }
+    let err = String::from_utf8_lossy(&status.stderr);
+    if err.contains("canceled") || err.contains("cancelled") || !status.status.success() {
+        return Err("cancelled".into());
+    }
+    Err("no keys could be removed".into())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn registry_remove_elevated(_keys: &[(String, PathBuf)]) -> Result<(), String> {
+    Err("registry keys only exist on Windows".into())
+}

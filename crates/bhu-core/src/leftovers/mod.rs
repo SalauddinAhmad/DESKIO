@@ -665,6 +665,7 @@ mod tests {
             reason: m.reason,
             requires_admin: false,
             shared_with: vec![],
+            registry_key: None,
         }];
         resolve_sharing(&mut lefts, &["com.google".to_string()], &[chrome]);
 
@@ -698,6 +699,7 @@ mod tests {
             reason: "vendor".into(),
             requires_admin: false,
             shared_with: vec![],
+            registry_key: None,
         }];
         resolve_sharing(
             &mut lefts,

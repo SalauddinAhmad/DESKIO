@@ -30,6 +30,7 @@ pub fn build_plan(app: InstalledApp, leftovers: Vec<Leftover>) -> RemovalPlan {
             confidence: Confidence::High,
             reason: "the application itself".into(),
             selected: true,
+            registry_key: None,
         });
     }
 
@@ -64,6 +65,79 @@ pub fn build_orphan_plan(leftovers: Vec<Leftover>) -> RemovalPlan {
         items,
         delegated_command: None,
     }
+}
+
+/// Where exported registry keys are kept, alongside the removal journal.
+pub fn registry_backup_dir() -> Option<std::path::PathBuf> {
+    let dir = crate::undo::data_dir()?.join("registry-backups");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir)
+}
+
+/// A filename that cannot escape the backup directory.
+fn backup_name(key: &str) -> String {
+    let safe: String = key
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("{}-{stamp}.reg", safe.trim_matches('-'))
+}
+
+/// Export a registry key, then delete it.
+///
+/// The export is not optional and not best-effort: a registry key cannot go to
+/// the Recycle Bin, so the `.reg` file *is* the undo. If the export fails, or
+/// produces nothing, the key is left exactly where it is.
+#[cfg(target_os = "windows")]
+fn remove_registry_key(key: &str) -> Result<std::path::PathBuf, String> {
+    crate::safety::check_registry_removable(key).map_err(|e| e.to_string())?;
+
+    let dir = registry_backup_dir().ok_or("no application data directory for the backup")?;
+    let backup = dir.join(backup_name(key));
+
+    let exported = crate::proc::command("reg")
+        .args(["export", key])
+        .arg(&backup)
+        .arg("/y")
+        .output()
+        .map_err(|e| format!("could not run reg export: {e}"))?;
+    if !exported.status.success() {
+        let err = String::from_utf8_lossy(&exported.stderr).trim().to_string();
+        return Err(if err.is_empty() {
+            "could not export the key, so it was left alone".into()
+        } else {
+            format!("could not export the key, so it was left alone: {err}")
+        });
+    }
+    let usable = std::fs::metadata(&backup)
+        .map(|m| m.len() > 0)
+        .unwrap_or(false);
+    if !usable {
+        return Err("the exported backup was empty, so the key was left alone".into());
+    }
+
+    let deleted = crate::proc::command("reg")
+        .args(["delete", key, "/f"])
+        .output()
+        .map_err(|e| format!("could not run reg delete: {e}"))?;
+    if !deleted.status.success() {
+        let err = String::from_utf8_lossy(&deleted.stderr).trim().to_string();
+        return Err(if err.is_empty() {
+            "the key could not be removed".into()
+        } else {
+            err
+        });
+    }
+    Ok(backup)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn remove_registry_key(_key: &str) -> Result<std::path::PathBuf, String> {
+    Err("registry keys only exist on Windows".into())
 }
 
 /// Execute the selected items of a plan.
@@ -114,7 +188,47 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
         }
     }
 
+    // Key and the file it will be exported to, decided once: the name carries a
+    // timestamp, so working it out twice would record a backup path that does
+    // not exist.
+    let mut deferred_keys: Vec<(String, std::path::PathBuf)> = Vec::new();
+
     for item in plan.selected_items() {
+        // Registry keys are not files: they are exported and deleted, never
+        // trashed, and machine-wide ones need the same elevation.
+        if let Some(key) = item.registry_key.clone() {
+            if item.requires_admin {
+                match registry_backup_dir() {
+                    Some(dir) => deferred_keys.push((key.clone(), dir.join(backup_name(&key)))),
+                    None => outcomes.push(RemovalOutcome {
+                        path: item.path.clone(),
+                        removed: false,
+                        already_gone: false,
+                        trashed_to: None,
+                        error: Some("no directory to export the key into".into()),
+                    }),
+                }
+            } else {
+                match remove_registry_key(&key) {
+                    Ok(backup) => outcomes.push(RemovalOutcome {
+                        path: item.path.clone(),
+                        removed: true,
+                        already_gone: false,
+                        trashed_to: Some(backup),
+                        error: None,
+                    }),
+                    Err(e) => outcomes.push(RemovalOutcome {
+                        path: item.path.clone(),
+                        removed: false,
+                        already_gone: false,
+                        trashed_to: None,
+                        error: Some(e),
+                    }),
+                }
+            }
+            continue;
+        }
+
         // The safety check runs here, at the point of no return.
         if let Err(e) = safety::check_removable(&item.path) {
             outcomes.push(RemovalOutcome {
@@ -171,6 +285,33 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
                 trashed_to: None,
                 error: Some(e.to_string()),
             }),
+        }
+    }
+
+    if !deferred_keys.is_empty() {
+        match crate::elevate::registry_remove_elevated(&deferred_keys) {
+            Ok(()) => {
+                for (key, backup) in &deferred_keys {
+                    outcomes.push(RemovalOutcome {
+                        path: std::path::PathBuf::from(key),
+                        removed: true,
+                        already_gone: false,
+                        trashed_to: Some(backup.clone()),
+                        error: None,
+                    });
+                }
+            }
+            Err(e) => {
+                for (key, _) in &deferred_keys {
+                    outcomes.push(RemovalOutcome {
+                        path: std::path::PathBuf::from(key),
+                        removed: false,
+                        already_gone: false,
+                        trashed_to: None,
+                        error: Some(e.clone()),
+                    });
+                }
+            }
         }
     }
 
@@ -369,6 +510,7 @@ mod tests {
             reason: "test".into(),
             requires_admin: false,
             shared_with: shared,
+            registry_key: None,
         }
     }
 
@@ -420,6 +562,7 @@ mod tests {
             reason: "malicious or buggy plan".into(),
             requires_admin: false,
             selected: true,
+            registry_key: None,
         });
         let report = execute(&plan, RemovalOptions::default());
         assert_eq!(report.removed_count(), 0);

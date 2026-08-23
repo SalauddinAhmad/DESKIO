@@ -12,6 +12,8 @@ use crate::fsutil;
 use crate::model::*;
 use crate::safety;
 use std::path::PathBuf;
+use winreg::enums::*;
+use winreg::RegKey;
 
 fn roots() -> Vec<(PathBuf, LeftoverKind)> {
     let mut v: Vec<(PathBuf, LeftoverKind)> = Vec::new();
@@ -54,6 +56,104 @@ fn is_system_owned(name: &str) -> bool {
             | "ssh"
             | "desktop.ini"
     ) || lower.starts_with('.')
+}
+
+/// Registry keys an application has left behind.
+///
+/// Uninstallers routinely remove their files and leave their settings. Those
+/// keys are harmless in themselves but they are the reason a reinstalled
+/// application remembers an expired trial, or a stale licence, or settings the
+/// user thought they had cleared.
+///
+/// The same matcher decides ownership here as for files, and the same rule
+/// about shared vendors applies: `Software\Adobe` holding several products is
+/// never itself removable — only the product key inside it.
+fn registry_leftovers(tokens: &AppTokens, others: &[AppTokens]) -> Vec<Leftover> {
+    // (hive handle, hive name for display, path under it)
+    let roots: [(RegKey, &str, &str); 3] = [
+        (RegKey::predef(HKEY_CURRENT_USER), "HKCU", "Software"),
+        (RegKey::predef(HKEY_LOCAL_MACHINE), "HKLM", "SOFTWARE"),
+        (
+            RegKey::predef(HKEY_LOCAL_MACHINE),
+            "HKLM",
+            "SOFTWARE\\WOW6432Node",
+        ),
+    ];
+
+    let mut found: Vec<Leftover> = Vec::new();
+    let mut names: Vec<String> = Vec::new();
+
+    for (root, hive, root_path) in roots {
+        let Ok(container) = root.open_subkey(root_path) else {
+            continue;
+        };
+        for name in container.enum_keys().flatten() {
+            let full = format!("{hive}\\{root_path}\\{name}");
+
+            if let Some(m) = classify(&name, tokens) {
+                if let Some(l) = registry_leftover(&full, &name, hive, m.confidence, m.reason) {
+                    found.push(l);
+                    names.push(name.clone());
+                }
+                continue;
+            }
+
+            // A vendor key holds one subkey per product. The vendor key itself
+            // is never taken; the product key inside it is.
+            if !super::is_vendor_dir(&name, tokens) {
+                continue;
+            }
+            let Ok(vendor) = container.open_subkey(&name) else {
+                continue;
+            };
+            for child in vendor.enum_keys().flatten() {
+                let Some(cm) = super::classify_in_vendor_dir(&child, tokens) else {
+                    continue;
+                };
+                let child_full = format!("{full}\\{child}");
+                if let Some(l) =
+                    registry_leftover(&child_full, &child, hive, cm.confidence, cm.reason)
+                {
+                    found.push(l);
+                    names.push(child);
+                }
+            }
+        }
+    }
+
+    resolve_sharing(&mut found, &names, others);
+    found
+}
+
+/// Build a registry leftover, refusing anything the safety rules would not
+/// allow us to remove — showing a key we could never touch is only noise.
+fn registry_leftover(
+    full: &str,
+    name: &str,
+    hive: &str,
+    confidence: Confidence,
+    reason: String,
+) -> Option<Leftover> {
+    if safety::check_registry_removable(full).is_err() {
+        return None;
+    }
+    Some(Leftover {
+        path: PathBuf::from(full),
+        name: name.to_string(),
+        // A registry key has no size worth reporting, and claiming "Zero KB"
+        // would read as though it were empty.
+        size_bytes: 0,
+        size_unknown: false,
+        is_directory: false,
+        kind: LeftoverKind::RegistryKey,
+        confidence,
+        reason,
+        // Machine-wide keys need an administrator, exactly as machine-wide
+        // files do.
+        requires_admin: hive.eq_ignore_ascii_case("HKLM"),
+        shared_with: Vec::new(),
+        registry_key: Some(full.to_string()),
+    })
 }
 
 pub fn for_app(app: &InstalledApp, all_apps: &[InstalledApp]) -> Vec<Leftover> {
@@ -111,6 +211,7 @@ pub fn for_app(app: &InstalledApp, all_apps: &[InstalledApp]) -> Vec<Leftover> {
                             reason: cm.reason,
                             requires_admin: safety::requires_admin(&child),
                             shared_with: Vec::new(),
+                            registry_key: None,
                             path: child,
                         });
                         names.push(cname);
@@ -130,6 +231,7 @@ pub fn for_app(app: &InstalledApp, all_apps: &[InstalledApp]) -> Vec<Leftover> {
                 reason: m.reason,
                 requires_admin: safety::requires_admin(&path),
                 shared_with: Vec::new(),
+                registry_key: None,
                 path,
             });
             names.push(name);
@@ -138,6 +240,10 @@ pub fn for_app(app: &InstalledApp, all_apps: &[InstalledApp]) -> Vec<Leftover> {
 
     let names: Vec<String> = found.iter().map(|l| l.name.clone()).collect();
     resolve_sharing(&mut found, &names, &others);
+
+    // Registry keys resolve their own sharing, so they are added after.
+    found.extend(registry_leftovers(&tokens, &others));
+
     for l in found.iter_mut() {
         if l.shared_with.is_empty() && l.confidence == Confidence::Medium {
             l.confidence = Confidence::High;
@@ -200,6 +306,7 @@ pub fn orphans(all_apps: &[InstalledApp]) -> Vec<OrphanGroup> {
                     reason: format!("\"{name}\" is not claimed by anything installed"),
                     requires_admin: safety::requires_admin(&path),
                     shared_with: Vec::new(),
+                    registry_key: None,
                     path,
                 };
                 match groups.iter_mut().find(|g| g.name == name) {

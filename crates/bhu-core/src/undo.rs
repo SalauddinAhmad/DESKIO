@@ -176,9 +176,22 @@ pub fn restore(entry_id: &str) -> Vec<RestoreOutcome> {
             if !trashed.exists() {
                 return fail("no longer in the trash");
             }
-            if item.original.exists() {
+            if registry_key_of(&item.original).is_none() && item.original.exists() {
                 return fail("something already exists at the original location");
             }
+            // A registry key comes back by importing the file it was exported
+            // to, not by moving anything.
+            if let Some(key) = registry_key_of(&item.original) {
+                return match import_registry(&trashed) {
+                    Ok(()) => RestoreOutcome {
+                        original: item.original,
+                        restored: true,
+                        error: None,
+                    },
+                    Err(e) => fail(&format!("could not import {key}: {e}")),
+                };
+            }
+
             let Some(parent) = item.original.parent() else {
                 return fail("the original location no longer makes sense");
             };
@@ -197,4 +210,39 @@ pub fn restore(entry_id: &str) -> Vec<RestoreOutcome> {
             }
         })
         .collect()
+}
+
+/// Recognise a recorded item as a registry key rather than a file.
+fn registry_key_of(original: &std::path::Path) -> Option<String> {
+    let text = original.to_string_lossy().to_string();
+    let hive = text.split('\\').next()?.to_lowercase();
+    matches!(
+        hive.as_str(),
+        "hkcu" | "hkey_current_user" | "hklm" | "hkey_local_machine"
+    )
+    .then_some(text)
+}
+
+/// Put a key back from the `.reg` file it was exported to.
+#[cfg(target_os = "windows")]
+fn import_registry(backup: &std::path::Path) -> Result<(), String> {
+    let out = crate::proc::command("reg")
+        .arg("import")
+        .arg(backup)
+        .output()
+        .map_err(|e| format!("could not run reg import: {e}"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+    Err(if err.is_empty() {
+        "reg import failed".into()
+    } else {
+        err
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+fn import_registry(_backup: &std::path::Path) -> Result<(), String> {
+    Err("registry keys only exist on Windows".into())
 }

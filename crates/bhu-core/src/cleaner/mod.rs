@@ -124,6 +124,7 @@ impl JunkItem {
                 .unwrap_or_else(|| self.category.label().to_string()),
             requires_admin: self.requires_admin,
             shared_with: Vec::new(),
+            registry_key: None,
         }
     }
 }

@@ -87,6 +87,7 @@ pub fn for_app(app: &InstalledApp, all_apps: &[InstalledApp]) -> Vec<Leftover> {
                 reason: m.reason,
                 requires_admin: safety::requires_admin(&path),
                 shared_with: Vec::new(),
+                registry_key: None,
                 path,
             });
         }
@@ -143,6 +144,7 @@ pub fn orphans(all_apps: &[InstalledApp]) -> Vec<OrphanGroup> {
                 reason: format!("\"{name}\" is not claimed by any installed package"),
                 requires_admin: safety::requires_admin(&path),
                 shared_with: Vec::new(),
+                registry_key: None,
                 path,
             };
             match groups.iter_mut().find(|g| g.name == name) {

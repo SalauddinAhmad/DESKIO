@@ -90,6 +90,18 @@ export function ReviewSheet(props: Props) {
             </div>
           )}
 
+          {selected.some((i) => i.registry_key) && (
+            <div className="banner" style={{ margin: "10px 4px 0" }}>
+              <IconWarn />
+              <div>
+                <strong>Registry keys are backed up before they are removed</strong>
+                A registry key cannot go to the {TRASH_NAME}, so each one is exported to a
+                .reg file first — that export is what the History screen puts back. A key
+                is never deleted unless its backup was written successfully.
+              </div>
+            </div>
+          )}
+
           {needsAdmin && (
             <div className="banner" style={{ margin: "10px 4px 0" }}>
               <IconWarn />
@@ -160,7 +172,9 @@ function Row({
           {item.reason}
         </div>
       </div>
-      <div className="item-size">{humanSize(item.size_bytes, item.size_unknown)}</div>
+      <div className="item-size">
+        {item.registry_key ? "Registry key" : humanSize(item.size_bytes, item.size_unknown)}
+      </div>
     </label>
   );
 }
