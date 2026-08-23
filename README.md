@@ -17,7 +17,7 @@ which apps have updates, and put any removal back. 100% open-source.
 > 🟢 Runs the author's daily Mac. Nothing is ever deleted — every removal moves
 > to the Trash, behind a review sheet showing every path and why it matched.
 
-![Applications](docs/screenshots/applications.png)
+![Applications](docs/screenshots/applications-main.png)
 
 ---
 
