@@ -355,6 +355,7 @@ mod tests {
             notarized: None,
             is_running: false,
             is_system: false,
+            scope: None,
         }
     }
 

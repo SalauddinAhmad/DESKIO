@@ -56,6 +56,7 @@ fn base(id: String, name: String, version: Option<String>, source: AppSource) ->
         notarized: None,
         is_running: false,
         is_system: false,
+        scope: None,
     }
 }
 

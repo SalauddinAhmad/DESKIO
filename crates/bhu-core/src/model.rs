@@ -117,6 +117,12 @@ pub struct InstalledApp {
     pub is_running: bool,
     /// True when this is an OS-supplied app that must never be offered for removal.
     pub is_system: bool,
+    /// Who the app was installed for, where the platform distinguishes it —
+    /// "All users" or "You" on Windows. The same product can legitimately be
+    /// installed both ways, which otherwise looks like a duplicate entry with
+    /// no way to tell the two apart.
+    #[serde(default)]
+    pub scope: Option<String>,
 }
 
 /// What kind of leftover a path is. Used for grouping in the UI and for

@@ -451,7 +451,6 @@ fn engine_version() -> String {
     bhu_core::VERSION.to_string()
 }
 
-
 /// Keep the window inside the part of the screen that is actually usable.
 ///
 /// A window is positioned against the whole monitor, but the taskbar, dock or

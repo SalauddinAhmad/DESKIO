@@ -110,6 +110,7 @@ fn read_bundle(path: &Path, source: AppSource, opts: ScanOptions) -> Option<Inst
         notarized: None,
         is_running: false,
         is_system,
+        scope: None,
     })
 }
 

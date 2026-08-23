@@ -107,7 +107,7 @@ export function AppsView({
               <AppIcon app={app} icons={icons} size={38} />
               <div className="card-main">
                 <div className="card-name">{app.name}</div>
-                <div className="card-sub">{formatDay(app.modified_at)}</div>
+                <div className="card-sub">{rowSubtitle(app)}</div>
               </div>
               <div className="card-size">{appSize(app.size_bytes)}</div>
             </button>
@@ -158,6 +158,7 @@ export function AppsView({
               <dl className="table">
                 <Row label="Version" value={view.version ?? "—"} />
                 <Row label="Identifier" value={view.bundle_id ?? "—"} />
+                {view.scope && <Row label="Installed for" value={view.scope} />}
                 <Row label="Location" value={view.path ?? "—"} />
                 <Row label="Modified" value={formatDate(view.modified_at)} />
                 <Row label="Last opened" value={details ? formatDate(view.last_opened_at) : "…"} />
@@ -183,6 +184,18 @@ export function AppsView({
       </div>
     </>
   );
+}
+
+/// What to show under an app's name.
+///
+/// macOS has a modification date for every app. Windows records one for almost
+/// none, so the row said "—" for everything; who the app was installed for is
+/// both available and useful there — it is what distinguishes a per-machine
+/// install from a per-user one when both are present.
+function rowSubtitle(app: InstalledApp): string {
+  if (app.modified_at) return formatDay(app.modified_at);
+  if (app.scope) return `Installed for ${app.scope.toLowerCase()}`;
+  return app.publisher ?? "—";
 }
 
 function Row({ label, value }: { label: string; value: string }) {

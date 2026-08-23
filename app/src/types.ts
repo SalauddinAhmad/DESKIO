@@ -26,6 +26,8 @@ export interface InstalledApp {
   notarized: boolean | null;
   is_running: boolean;
   is_system: boolean;
+  /** "All users" or "You" on Windows; absent elsewhere. */
+  scope: string | null;
 }
 
 export interface RemovalItem {
