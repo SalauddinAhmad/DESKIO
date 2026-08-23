@@ -91,6 +91,12 @@ and have not been confirmed working:
   "No". Check whether the install directory is gone instead.
 - **An item that is already gone is a success, not a failure** — the app's own
   uninstaller usually removed it a second earlier.
+- **Full Disk Access is bound to the build, not the app.** Ad-hoc signing means
+  macOS identifies the app by cdhash, so every release invalidates the grant
+  while the System Settings entry still looks switched on. Removing and
+  re-adding it is the fix. A real Developer ID would make grants survive
+  updates. TCC is *also* per-process, so a grant never reaches a running app —
+  two different failures that look identical.
 - **`launchctl print-disabled` wording changed**: older macOS prints `=> true`,
   macOS 26/27 prints `=> disabled`. Parse both.
 - **macOS ships bash 3.2** — no `mapfile` in CI scripts.

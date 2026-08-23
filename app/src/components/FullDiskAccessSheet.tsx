@@ -126,6 +126,18 @@ export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
             <li>Come back here and press <b>Check again</b>.</li>
           </ol>
 
+          <div className="banner" style={{ margin: "14px 0 0" }}>
+            <IconWarn />
+            <div>
+              <strong>Already in the list and switched on?</strong>
+              Then remove it with the <b>−</b> button and add it again. BHUninstaller is
+              not signed with an Apple developer certificate, so macOS identifies it by
+              the exact build — and every update is a different build. The old entry stays
+              in the list looking correct while no longer applying to the app you are
+              running.
+            </div>
+          </div>
+
           {openFailed && (
             <div className="banner" style={{ margin: "18px 0 0", color: "var(--danger)" }}>
               <IconWarn />
