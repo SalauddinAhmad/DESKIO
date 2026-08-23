@@ -10,8 +10,8 @@ which apps have updates, and put any removal back. 100% open-source.
 
 | Platform | Status |
 |----------|--------|
-| 🍎 **macOS** | ✅ **Stable** — Apple Silicon + Intel |
-| 🪟 **Windows** | 🟡 **Written, untested** — compiles in CI, never run |
+| 🍎 **macOS** | ✅ **Stable** — Apple Silicon + Intel, used daily |
+| 🪟 **Windows** | ✅ **Working** — uninstall tested on Windows 11; some parts still new |
 | 🐧 **Linux** | 🟡 **Written, untested** — compiles in CI, never run |
 
 > 🟢 Runs the author's daily Mac. Nothing is ever deleted — every removal moves
@@ -87,16 +87,30 @@ Things it could do and does not, each for a reason:
 
 ## 💻 Platform support
 
-| | Discovery | Leftovers | Startup | Extensions | Cleanup | Status |
-|---|---|---|---|---|---|---|
-| **macOS** | ✅ | ✅ | ✅ | ✅ | ✅ | Working, used daily |
-| **Windows** | ✅ | ✅ | ✅ | ✅ | ✅ | **Compiles, never run** |
-| **Linux** | ✅ | ✅ | ✅ | ✅ | ✅ | **Compiles, never run** |
+Every section is implemented on every platform:
 
-The Windows and Linux adapters were written on a Mac and are checked against
-their real targets in CI, so they compile and their types are right. Nobody has
-executed them yet. Treat those builds as untested: run `bhu list` and
-`bhu plan <app>` first, which change nothing, before trusting a removal.
+| | Discovery | Leftovers | Startup | Extensions | Cleanup | Registry |
+|---|---|---|---|---|---|---|
+| **macOS** | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| **Windows** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Linux** | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+
+How much has actually been *run* is a different question, and worth being plain
+about:
+
+- **macOS** — all of it, daily, on the machine it was written on.
+- **Windows** — the Applications list and uninstalling, thoroughly, on Windows 11:
+  icons, sizes, the vendor's own uninstaller, the leftover sweep and the
+  confirmation screen. **Registry leftovers are new in 0.2.0 and have not been
+  run.** Startup Programs, Extensions, Cleanup and restoring from History have
+  had less attention there than they have on macOS.
+- **Linux** — nothing. It compiles and is built in CI, and that is all that is
+  known about it.
+
+If you are on Linux, or trying the newer Windows parts, start with the read-only
+views. `bhu list`, `bhu plan <app>`, `bhu orphans` and `bhu cleanup` change
+nothing at all, and the review sheet shows you the whole plan before anything
+moves. [Reports are welcome](https://github.com/wpexpertinbd/BHUninstaller/issues).
 
 ## 🔓 Full Disk Access (macOS)
 
