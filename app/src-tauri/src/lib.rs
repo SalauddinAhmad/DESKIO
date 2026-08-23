@@ -15,7 +15,7 @@ use bhu_core::settings::Settings;
 use bhu_core::startup::StartupItem;
 use bhu_core::undo::{RestoreOutcome, UndoEntry};
 use bhu_core::updates::UpdateInfo;
-use bhu_core::{discovery, leftovers, removal};
+use bhu_core::{discovery, removal};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -424,23 +424,23 @@ fn installer_command(path: &std::path::Path, ext: &str) -> std::process::Command
     {
         // An .msi is data, not a program: it needs msiexec to run it.
         if ext == "msi" {
-            let mut c = std::process::Command::new("msiexec");
+            let mut c = bhu_core::proc::command("msiexec");
             c.arg("/i").arg(path);
             return c;
         }
-        return std::process::Command::new(path);
+        return bhu_core::proc::command(path);
     }
     #[cfg(target_os = "macos")]
     {
         let _ = ext;
-        let mut c = std::process::Command::new("/usr/bin/open");
+        let mut c = bhu_core::proc::command("/usr/bin/open");
         c.arg(path);
         c
     }
     #[cfg(target_os = "linux")]
     {
         let _ = ext;
-        let mut c = std::process::Command::new("xdg-open");
+        let mut c = bhu_core::proc::command("xdg-open");
         c.arg(path);
         c
     }

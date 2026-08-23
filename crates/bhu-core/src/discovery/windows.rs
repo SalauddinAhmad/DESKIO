@@ -10,7 +10,6 @@ use crate::fsutil;
 use crate::model::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use winreg::enums::*;
 use winreg::RegKey;
 
@@ -327,7 +326,7 @@ pub fn icons(apps: &[InstalledApp]) -> HashMap<String, String> {
         return HashMap::new();
     }
 
-    let _ = Command::new("powershell")
+    let _ = crate::proc::command("powershell")
         .args([
             "-NoProfile",
             "-NonInteractive",

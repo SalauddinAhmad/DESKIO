@@ -29,6 +29,7 @@ pub mod extensions;
 pub mod fsutil;
 pub mod leftovers;
 pub mod model;
+pub mod proc;
 pub mod removal;
 pub mod safety;
 #[cfg(feature = "updates")]

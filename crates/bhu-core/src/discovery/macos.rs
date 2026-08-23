@@ -8,7 +8,6 @@ use crate::discovery::ScanOptions;
 use crate::fsutil;
 use crate::model::*;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Places a user's own applications live. `/System/Applications` is
 /// deliberately absent: those are OS apps and are not removable.
@@ -151,7 +150,7 @@ pub fn icons(apps: &[InstalledApp]) -> std::collections::HashMap<String, String>
 /// Also the most reliable vendor token we have for leftover matching, since it
 /// is what the vendor actually calls themselves.
 fn signing_authority(path: &Path) -> Option<String> {
-    let out = Command::new("/usr/bin/codesign")
+    let out = crate::proc::command("/usr/bin/codesign")
         .args(["-dv", "--verbose=2"])
         .arg(path)
         .output()
@@ -173,7 +172,7 @@ fn signing_authority(path: &Path) -> Option<String> {
 }
 
 fn is_notarized(path: &Path) -> bool {
-    let Ok(out) = Command::new("/usr/sbin/spctl")
+    let Ok(out) = crate::proc::command("/usr/sbin/spctl")
         .args(["-a", "-vv"])
         .arg(path)
         .output()
@@ -187,7 +186,7 @@ fn is_notarized(path: &Path) -> bool {
 /// records it. Returns `None` when Spotlight has no entry (common for apps that
 /// have never been launched, and on volumes with indexing disabled).
 fn last_used(path: &Path) -> Option<i64> {
-    let out = Command::new("/usr/bin/mdls")
+    let out = crate::proc::command("/usr/bin/mdls")
         .args(["-raw", "-name", "kMDItemLastUsedDate"])
         .arg(path)
         .output()
@@ -201,7 +200,7 @@ fn last_used(path: &Path) -> Option<i64> {
 }
 
 fn parse_mdls_date(raw: &str) -> Option<i64> {
-    let out = Command::new("/bin/date")
+    let out = crate::proc::command("/bin/date")
         .args(["-j", "-f", "%Y-%m-%d %H:%M:%S %z", raw, "+%s"])
         .output()
         .ok()?;
@@ -215,7 +214,10 @@ fn parse_mdls_date(raw: &str) -> Option<i64> {
 /// app leaves the process alive with its files gone, so the UI must offer to
 /// quit it first.
 fn is_running(path: &Path) -> bool {
-    let Ok(out) = Command::new("/bin/ps").args(["-A", "-o", "comm="]).output() else {
+    let Ok(out) = crate::proc::command("/bin/ps")
+        .args(["-A", "-o", "comm="])
+        .output()
+    else {
         return false;
     };
     let prefix = path.to_string_lossy().to_string();
@@ -238,7 +240,7 @@ fn icon_png(path: &Path) -> Option<String> {
         "icon-{}.png",
         N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
-    let ok = Command::new("/usr/bin/sips")
+    let ok = crate::proc::command("/usr/bin/sips")
         .args(["-s", "format", "png", "-Z", "256"])
         .arg(&icns)
         .arg("--out")

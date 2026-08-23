@@ -9,11 +9,10 @@ use crate::discovery::ScanOptions;
 use crate::fsutil;
 use crate::model::*;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Run a command, returning its stdout when it exists and succeeds.
 fn output(program: &str, args: &[&str]) -> Option<String> {
-    let out = Command::new(program).args(args).output().ok()?;
+    let out = crate::proc::command(program).args(args).output().ok()?;
     out.status
         .success()
         .then(|| String::from_utf8_lossy(&out.stdout).to_string())

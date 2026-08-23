@@ -19,7 +19,6 @@ use std::path::{Path, PathBuf};
 /// folder in the user's Trash. Returns the folder it created.
 #[cfg(target_os = "macos")]
 pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String> {
-    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     if paths.is_empty() {
@@ -74,7 +73,7 @@ end run"#;
     // SAFETY: getuid/getgid cannot fail and take no arguments.
     let uidgid = unsafe { format!("{}:{}", libc::getuid(), libc::getgid()) };
 
-    let mut cmd = Command::new("/usr/bin/osascript");
+    let mut cmd = crate::proc::command("/usr/bin/osascript");
     cmd.arg("-e").arg(script).arg("--").arg(&dest).arg(uidgid);
     for p in paths {
         cmd.arg(p);
@@ -113,7 +112,6 @@ end run"#;
 #[cfg(target_os = "windows")]
 pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String> {
     use std::io::Write;
-    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     if paths.is_empty() {
@@ -181,7 +179,7 @@ foreach ($p in Get-Content -LiteralPath $PathsFile -Encoding UTF8) {
         q(&dest)
     );
 
-    let out = Command::new("powershell")
+    let out = crate::proc::command("powershell")
         .args([
             "-NoProfile",
             "-ExecutionPolicy",

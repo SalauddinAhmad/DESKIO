@@ -15,7 +15,6 @@ use super::{StartupItem, StartupKind};
 use crate::fsutil;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 fn uid() -> u32 {
     // SAFETY: getuid cannot fail and takes no arguments.
@@ -42,7 +41,7 @@ fn roots() -> Vec<(PathBuf, StartupKind)> {
 /// Labels launchd has been told not to run, per domain.
 fn disabled_labels(domain: &str) -> HashSet<String> {
     let mut out = HashSet::new();
-    let Ok(res) = Command::new("/bin/launchctl")
+    let Ok(res) = crate::proc::command("/bin/launchctl")
         .args(["print-disabled", domain])
         .output()
     else {
@@ -181,7 +180,7 @@ fn login_items() -> Vec<StartupItem> {
     return out
 end tell"#;
 
-    let Ok(res) = Command::new("/usr/bin/osascript")
+    let Ok(res) = crate::proc::command("/usr/bin/osascript")
         .arg("-e")
         .arg(script)
         .output()
@@ -236,7 +235,7 @@ pub fn set_enabled(item: &StartupItem, enabled: bool) -> Result<(), String> {
         return set_enabled_elevated(verb, &target, item, enabled);
     }
 
-    let out = Command::new("/bin/launchctl")
+    let out = crate::proc::command("/bin/launchctl")
         .args([verb, &target])
         .output()
         .map_err(|e| format!("could not run launchctl: {e}"))?;
@@ -254,13 +253,13 @@ pub fn set_enabled(item: &StartupItem, enabled: bool) -> Result<(), String> {
     // switch actually promises.
     if let Some(path) = &item.path {
         let _ = if enabled {
-            Command::new("/bin/launchctl")
+            crate::proc::command("/bin/launchctl")
                 .arg("bootstrap")
                 .arg(&domain)
                 .arg(path)
                 .output()
         } else {
-            Command::new("/bin/launchctl")
+            crate::proc::command("/bin/launchctl")
                 .args(["bootout", &target])
                 .output()
         };
@@ -287,7 +286,7 @@ fn set_enabled_elevated(
     do shell script cmd with administrator privileges
 end run"#;
 
-    let mut cmd = Command::new("/usr/bin/osascript");
+    let mut cmd = crate::proc::command("/usr/bin/osascript");
     cmd.arg("-e").arg(script).arg("--").arg(verb).arg(target);
     if let Some(path) = &item.path {
         cmd.arg(path);

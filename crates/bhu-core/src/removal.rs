@@ -221,9 +221,8 @@ pub fn execute(plan: &RemovalPlan, opts: RemovalOptions) -> RemovalReport {
 /// only runs on Windows and Linux and has not been tried on either.
 #[cfg(not(target_os = "windows"))]
 fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), String> {
-    use std::process::Command;
     let _ = verify;
-    let status = Command::new("/bin/sh")
+    let status = crate::proc::command("/bin/sh")
         .args(["-c", command])
         .status()
         .map_err(|e| format!("could not start the uninstaller: {e}"))?;
@@ -256,7 +255,6 @@ fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), 
 #[cfg(target_os = "windows")]
 fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), String> {
     use std::io::Write;
-    use std::process::Command;
 
     let work = std::env::temp_dir().join(format!("BHUninstaller-uninstall-{}", std::process::id()));
     std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
@@ -272,7 +270,7 @@ fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), 
     let inner = format!(
         "$p = Start-Process -FilePath cmd.exe -ArgumentList '/C','{quoted}' -Verb RunAs -Wait -PassThru; exit $p.ExitCode"
     );
-    let out = Command::new("powershell")
+    let out = crate::proc::command("powershell")
         .args([
             "-NoProfile",
             "-ExecutionPolicy",
@@ -317,7 +315,7 @@ fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), 
 fn timestamp() -> String {
     #[cfg(unix)]
     {
-        if let Ok(out) = std::process::Command::new("/bin/date")
+        if let Ok(out) = crate::proc::command("/bin/date")
             .arg("+%Y-%m-%d %H.%M.%S")
             .output()
         {
