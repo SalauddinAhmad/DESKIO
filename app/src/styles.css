@@ -371,8 +371,29 @@ button { font: inherit; color: inherit; cursor: default; }
   padding: 10px 12px; color: var(--bh-500); font-weight: 600; font-size: 13px;
 }
 
-.result-line { display: flex; gap: 8px; padding: 5px 0; font-size: 13px; }
+.result-line { display: flex; gap: 9px; padding: 9px 0; font-size: 13px; align-items: flex-start; }
+.result-line + .result-line { border-top: 1px solid var(--line-2); }
 .result-line.bad { color: var(--danger); }
+
+/* Every inline icon needs an explicit size. Without one an svg with no width
+   stretches to fill its flex container — which is how the warning mark ended
+   up several hundred pixels tall on the completion screen. */
+.result-line svg,
+.banner svg,
+.result-hero svg { flex: 0 0 auto; }
+.result-line svg { width: 15px; height: 15px; margin-top: 2px; }
+.banner svg { width: 16px; height: 16px; margin-top: 1px; }
+
+.result-hero {
+  display: flex; gap: 15px; align-items: flex-start;
+  background: var(--tint); border: 1px solid var(--line);
+  border-radius: 13px; padding: 17px 19px; margin-bottom: 18px;
+}
+.result-hero svg { width: 28px; height: 28px; color: var(--ok); margin-top: 2px; }
+.result-hero.bad svg { color: var(--danger); }
+.result-headline { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+.result-detail { font-size: 13px; color: var(--ink-2); margin-top: 4px; }
+.result-note { font-size: 12.5px; color: var(--muted); margin: 18px 0 0; }
 
 /* scrollbars */
 ::-webkit-scrollbar { width: 11px; height: 11px; }

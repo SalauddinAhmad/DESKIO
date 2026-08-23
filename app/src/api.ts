@@ -264,3 +264,9 @@ export function formatDay(unixSeconds: number | null): string {
     day: "numeric", month: "short", year: "numeric",
   });
 }
+
+/** What this platform calls the trash, so the interface uses the user's word. */
+export const TRASH_NAME =
+  typeof navigator !== "undefined" && /Win/i.test(navigator.platform ?? "")
+    ? "Recycle Bin"
+    : "Trash";

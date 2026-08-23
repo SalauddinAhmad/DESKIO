@@ -8,7 +8,7 @@
 use crate::discovery::ScanOptions;
 use crate::fsutil;
 use crate::model::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Run a command, returning its stdout when it exists and succeeds.
@@ -268,8 +268,98 @@ pub fn uninstall_command(app: &InstalledApp) -> Option<String> {
 
 pub fn enrich(_app: &mut InstalledApp) {}
 
-pub fn icon(_app: &InstalledApp) -> Option<String> {
-    // Resolving a .desktop Icon= through the XDG theme spec is more than this
-    // needs right now; the list falls back to initials.
+/// The app's icon, found through its `.desktop` entry.
+///
+/// No subprocess and no image decoding: the icon named there is looked up in
+/// the standard theme directories and, if a PNG is found, its bytes are used
+/// as they are. SVG-only icons are skipped — rasterising them would mean
+/// pulling in a renderer for a 38-pixel row.
+pub fn icon(app: &InstalledApp) -> Option<String> {
+    let name = desktop_icon_name(&app.id)?;
+
+    // An absolute path in Icon= is used directly.
+    let direct = PathBuf::from(&name);
+    if direct.is_absolute() {
+        return read_png(&direct);
+    }
+
+    let mut roots: Vec<PathBuf> = vec![
+        PathBuf::from("/usr/share/icons/hicolor"),
+        PathBuf::from("/usr/local/share/icons/hicolor"),
+        PathBuf::from("/var/lib/flatpak/exports/share/icons/hicolor"),
+    ];
+    if let Some(home) = dirs::home_dir() {
+        roots.push(home.join(".local/share/icons/hicolor"));
+        roots.push(home.join(".icons/hicolor"));
+    }
+
+    // Biggest first: the list shows them at 38 points, and downscaling a large
+    // icon looks far better than upscaling a 16-pixel one.
+    for size in [
+        "256x256", "192x192", "128x128", "96x96", "64x64", "48x48", "scalable",
+    ] {
+        for root in &roots {
+            let candidate = root.join(size).join("apps").join(format!("{name}.png"));
+            if let Some(png) = read_png(&candidate) {
+                return Some(png);
+            }
+        }
+    }
+
+    // The old flat location, still used by plenty of packages.
+    for dir in ["/usr/share/pixmaps", "/usr/local/share/pixmaps"] {
+        if let Some(png) = read_png(&PathBuf::from(dir).join(format!("{name}.png"))) {
+            return Some(png);
+        }
+    }
+    None
+}
+
+pub fn icons(apps: &[InstalledApp]) -> std::collections::HashMap<String, String> {
+    super::icons_in_parallel(apps, icon)
+}
+
+/// Read a PNG, rejecting anything that is not one — the extension alone is not
+/// enough to trust bytes we are about to hand to a webview as an image.
+fn read_png(path: &Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    if bytes.len() < 8 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
+        return None;
+    }
+    // Icons are small; anything enormous is not one.
+    if bytes.len() > 4 * 1024 * 1024 {
+        return None;
+    }
+    Some(crate::base64_encode(&bytes))
+}
+
+/// The `Icon=` value from this app's `.desktop` entry.
+fn desktop_icon_name(id: &str) -> Option<String> {
+    let mut dirs: Vec<PathBuf> = vec![
+        PathBuf::from("/usr/share/applications"),
+        PathBuf::from("/usr/local/share/applications"),
+        PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+        PathBuf::from("/var/lib/snapd/desktop/applications"),
+    ];
+    if let Some(home) = dirs::home_dir() {
+        dirs.push(home.join(".local/share/applications"));
+    }
+
+    for dir in dirs {
+        for candidate in [format!("{id}.desktop"), format!("{id}_{id}.desktop")] {
+            let path = dir.join(&candidate);
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            if let Some(icon) = text
+                .lines()
+                .find_map(|l| l.strip_prefix("Icon="))
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+            {
+                return Some(icon);
+            }
+        }
+    }
     None
 }

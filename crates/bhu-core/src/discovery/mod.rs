@@ -85,12 +85,25 @@ pub fn icon(app: &InstalledApp) -> Option<String> {
     imp::icon(app)
 }
 
-/// Icons for a whole list, extracted in parallel.
+/// Icons for a whole list.
 ///
-/// Each icon costs a subprocess, so doing several hundred in sequence takes
-/// long enough that the list sits there showing placeholders. Spreading them
-/// across threads turns that into a couple of seconds.
+/// Each platform does this its own way: one subprocess per app in parallel on
+/// macOS, a single batch on Windows because starting PowerShell is the
+/// expensive part, and a plain file read on Linux. So the whole operation is
+/// delegated rather than the per-app step.
 pub fn icons(apps: &[InstalledApp]) -> std::collections::HashMap<String, String> {
+    imp::icons(apps)
+}
+
+/// Run `extract` for every app across several threads.
+///
+/// Shared by the platforms whose extraction is per-app and subprocess-bound.
+/// Windows does not use it — there, one batched call is cheaper than many.
+#[cfg_attr(target_os = "windows", allow(dead_code))]
+pub(crate) fn icons_in_parallel(
+    apps: &[InstalledApp],
+    extract: fn(&InstalledApp) -> Option<String>,
+) -> std::collections::HashMap<String, String> {
     let workers = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
@@ -104,7 +117,7 @@ pub fn icons(apps: &[InstalledApp]) -> std::collections::HashMap<String, String>
             .map(|c| {
                 scope.spawn(move || {
                     c.iter()
-                        .filter_map(|a| imp::icon(a).map(|i| (a.id.clone(), i)))
+                        .filter_map(|a| extract(a).map(|i| (a.id.clone(), i)))
                         .collect::<Vec<_>>()
                 })
             })

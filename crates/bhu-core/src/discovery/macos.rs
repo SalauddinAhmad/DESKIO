@@ -140,6 +140,12 @@ pub fn icon(app: &InstalledApp) -> Option<String> {
     icon_png(app.path.as_ref()?)
 }
 
+/// One `sips` per app, spread across threads — doing several hundred in
+/// sequence left the list showing placeholders for the better part of a minute.
+pub fn icons(apps: &[InstalledApp]) -> std::collections::HashMap<String, String> {
+    super::icons_in_parallel(apps, icon)
+}
+
 /// The Developer ID the app is signed with — the "Developer" row in the UI.
 /// Also the most reliable vendor token we have for leftover matching, since it
 /// is what the vendor actually calls themselves.

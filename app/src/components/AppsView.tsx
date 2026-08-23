@@ -11,10 +11,14 @@ interface Props {
   icons: Record<string, string>;
   banner: React.ReactNode;
   loading: boolean;
+  /** Changes when something has been removed, so the selection can be dropped. */
+  removalNonce: number;
   onUninstall: (app: InstalledApp) => void;
 }
 
-export function AppsView({ apps, icons, banner, loading, onUninstall }: Props) {
+export function AppsView({
+  apps, icons, banner, loading, removalNonce, onUninstall,
+}: Props) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("name");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -38,6 +42,14 @@ export function AppsView({ apps, icons, banner, loading, onUninstall }: Props) {
   }, [apps, query, sort]);
 
   const selected = apps.find((a) => a.id === selectedId) ?? null;
+
+  // A removal has happened: whatever was selected is very likely gone, so the
+  // detail pane is cleared rather than left showing an app that no longer
+  // exists — which previously kept offering to uninstall it again.
+  useEffect(() => {
+    setSelectedId(null);
+    setDetails(null);
+  }, [removalNonce]);
 
   // The detail pane's fields each cost a subprocess, so they are fetched only
   // for the app actually being looked at.

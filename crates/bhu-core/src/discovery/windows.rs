@@ -8,7 +8,9 @@
 use crate::discovery::ScanOptions;
 use crate::fsutil;
 use crate::model::*;
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use winreg::enums::*;
 use winreg::RegKey;
 
@@ -160,8 +162,132 @@ pub fn enrich(app: &mut InstalledApp) {
     }
 }
 
-pub fn icon(_app: &InstalledApp) -> Option<String> {
-    // Extracting an icon resource from a PE binary needs more than the standard
-    // library offers; the list falls back to initials until it is done.
+pub fn icon(app: &InstalledApp) -> Option<String> {
+    icons(std::slice::from_ref(app)).into_values().next()
+}
+
+/// Icons for the whole list, extracted in one pass.
+///
+/// Windows keeps an app's icon inside its executable, and pulling one out means
+/// Win32 interop — or one line of .NET. PowerShell has that .NET available, so
+/// it does the work; but starting PowerShell costs a few hundred milliseconds,
+/// which across a hundred apps would be half a minute of placeholders. So a
+/// single script handles every app at once and Rust reads the results.
+///
+/// The icons come out at 32x32, which is what `ExtractAssociatedIcon` gives for
+/// an executable. Sharper would need `SHGetFileInfo` and real interop.
+pub fn icons(apps: &[InstalledApp]) -> HashMap<String, String> {
+    let sources: Vec<(String, String)> = apps
+        .iter()
+        .filter_map(|a| icon_source(a).map(|src| (a.id.clone(), src)))
+        .collect();
+    if sources.is_empty() {
+        return HashMap::new();
+    }
+
+    // A directory of our own, created fresh, so nothing can pre-place a file
+    // for us to read back as an icon.
+    let dir = std::env::temp_dir().join(format!("bhu-icons-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return HashMap::new();
+    }
+
+    let mut script = String::from(
+        "$ErrorActionPreference='SilentlyContinue'\nAdd-Type -AssemblyName System.Drawing\n",
+    );
+    for (i, (_, src)) in sources.iter().enumerate() {
+        script.push_str(&format!(
+            "try {{\n  $p = {src}\n  if ($p.ToLower().EndsWith('.ico')) {{ $ic = New-Object              System.Drawing.Icon($p) }} else {{ $ic =              [System.Drawing.Icon]::ExtractAssociatedIcon($p) }}\n  if ($ic -ne $null) {{ $b =              $ic.ToBitmap(); $b.Save({out}, [System.Drawing.Imaging.ImageFormat]::Png);              $b.Dispose(); $ic.Dispose() }}\n}} catch {{}}\n",
+            src = ps_quote(src),
+            out = ps_quote(&dir.join(format!("{i}.png")).to_string_lossy()),
+        ));
+    }
+
+    let script_path = dir.join("extract.ps1");
+    if std::fs::write(&script_path, script).is_err() {
+        return HashMap::new();
+    }
+
+    let _ = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(&script_path)
+        .output();
+
+    let mut out = HashMap::new();
+    for (i, (id, _)) in sources.iter().enumerate() {
+        if let Ok(bytes) = std::fs::read(dir.join(format!("{i}.png"))) {
+            if !bytes.is_empty() {
+                out.insert(id.clone(), crate::base64_encode(&bytes));
+            }
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+    out
+}
+
+/// A single-quoted PowerShell string. Only `'` is special inside one, and it is
+/// escaped by doubling — so a path can never break out of the literal.
+fn ps_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "''"))
+}
+
+/// Where this app's icon lives: the registry's `DisplayIcon` if it has one,
+/// otherwise the most likely executable in its install directory.
+fn icon_source(app: &InstalledApp) -> Option<String> {
+    if let Some(display_icon) = registry_value(&app.id, "DisplayIcon") {
+        // `DisplayIcon` is often `C:\path\app.exe,0` — the index selects which
+        // icon in the file, and is not part of the path.
+        let path = display_icon
+            .rsplit_once(',')
+            .map(|(p, _)| p)
+            .unwrap_or(&display_icon)
+            .trim()
+            .trim_matches('"')
+            .to_string();
+        if !path.is_empty() && Path::new(&path).is_file() {
+            return Some(path);
+        }
+    }
+
+    // No usable DisplayIcon: look for an executable named after the app, then
+    // fall back to any executable that is not obviously an uninstaller.
+    let dir = app.path.as_ref()?;
+    let wanted = crate::leftovers::slug(&app.name);
+    let mut fallback: Option<String> = None;
+    for entry in fsutil::children(dir) {
+        if entry.extension().and_then(|e| e.to_str()) != Some("exe") {
+            continue;
+        }
+        let stem = entry.file_stem()?.to_string_lossy().to_string();
+        let slug = crate::leftovers::slug(&stem);
+        if slug.contains("uninst") || slug.contains("setup") || slug.contains("crashpad") {
+            continue;
+        }
+        if !wanted.is_empty() && (wanted.contains(&slug) || slug.contains(&wanted)) {
+            return Some(entry.to_string_lossy().to_string());
+        }
+        fallback.get_or_insert_with(|| entry.to_string_lossy().to_string());
+    }
+    fallback
+}
+
+/// Read one value from this app's uninstall key, wherever it lives.
+fn registry_value(key_name: &str, value: &str) -> Option<String> {
+    for (root, path) in [
+        (RegKey::predef(HKEY_LOCAL_MACHINE), UNINSTALL),
+        (RegKey::predef(HKEY_LOCAL_MACHINE), UNINSTALL_WOW),
+        (RegKey::predef(HKEY_CURRENT_USER), UNINSTALL),
+    ] {
+        if let Ok(container) = root.open_subkey(path) {
+            if let Ok(key) = container.open_subkey(key_name) {
+                if let Ok(v) = key.get_value::<String, _>(value) {
+                    if !v.trim().is_empty() {
+                        return Some(v);
+                    }
+                }
+            }
+        }
+    }
     None
 }

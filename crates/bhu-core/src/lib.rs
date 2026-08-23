@@ -43,8 +43,8 @@ pub mod version;
 
 pub use model::*;
 
-/// Base64 for the icon blobs handed to the UI.
-#[cfg(target_os = "macos")]
+/// Base64 for the icon blobs handed to the UI. Needed wherever icons are
+/// extracted, which is now every platform.
 pub(crate) fn base64_encode(bytes: &[u8]) -> String {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD.encode(bytes)

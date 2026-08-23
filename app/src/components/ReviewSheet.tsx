@@ -6,8 +6,8 @@
  */
 import { useMemo, useState } from "react";
 import type { RemovalItem, RemovalPlan, RemovalReport } from "../types";
-import { humanSize } from "../api";
-import { IconTrash, IconWarn } from "./icons";
+import { humanSize, TRASH_NAME } from "../api";
+import { IconCheck, IconTrash, IconWarn } from "./icons";
 
 interface Props {
   plan: RemovalPlan;
@@ -38,7 +38,15 @@ export function ReviewSheet(props: Props) {
   const needsAdmin = selected.some((i) => i.requires_admin);
 
   if (report) {
-    return <ResultView report={report} busy={busy} onForce={onForce} onClose={onCancel} />;
+    return (
+      <ResultView
+        report={report}
+        appName={plan.app?.name ?? null}
+        busy={busy}
+        onForce={onForce}
+        onClose={onCancel}
+      />
+    );
   }
 
   return (
@@ -158,9 +166,10 @@ function Row({
 }
 
 function ResultView({
-  report, busy, onForce, onClose,
+  report, appName, busy, onForce, onClose,
 }: {
   report: RemovalReport;
+  appName: string | null;
   busy: boolean;
   onForce: () => void;
   onClose: () => void;
@@ -168,79 +177,111 @@ function ResultView({
   const moved = report.outcomes.filter((o) => o.removed && !o.already_gone);
   const alreadyGone = report.outcomes.filter((o) => o.already_gone);
   const failed = report.outcomes.filter((o) => !o.removed);
+  const name = appName;
+
+  // What actually happened, in one sentence, without making the user work it
+  // out from three numbers. The case that used to read as failure — "0 items
+  // moved to the Trash, Zero KB" — is the app's own uninstaller having already
+  // done the job, which is a complete success and now says so.
+  let headline: string;
+  let detail: string;
+
+  if (report.delegated_failed) {
+    headline = name
+      ? `${name}'s own uninstaller did not finish`
+      : "The application's own uninstaller did not finish";
+    detail =
+      "Nothing was removed. This usually means the uninstaller was cancelled, or it " +
+      "needed a password it did not get. You can try again, or clear the files anyway.";
+  } else if (failed.length > 0 && moved.length === 0) {
+    headline = "Nothing was removed";
+    detail =
+      failed.length === 1
+        ? "One item could not be removed. It is listed below."
+        : `${failed.length} items could not be removed. They are listed below.`;
+  } else if (moved.length === 0 && alreadyGone.length > 0) {
+    headline = name ? `${name} was already gone` : "Everything was already gone";
+    detail = report.delegated_ran
+      ? "Its own uninstaller had removed everything, and there was nothing left behind to clear up."
+      : "Everything selected had already been removed, so there was nothing left to do.";
+  } else {
+    const count = `${moved.length} item${moved.length === 1 ? "" : "s"}`;
+    headline = name ? `${name} was removed` : `${count} removed`;
+    if (report.delegated_ran) {
+      detail = `Its own uninstaller removed the application. BHUninstaller cleared ${count} it left behind, freeing ${humanSize(
+        report.bytes_freed
+      )}.`;
+    } else {
+      detail = `${count} moved to the Trash, freeing ${humanSize(report.bytes_freed)}.`;
+    }
+    if (failed.length === 0) {
+      detail += " Nothing was left behind.";
+    }
+  }
+
   return (
     <div className="sheet-backdrop">
-      <div className="sheet" role="dialog" aria-modal="true">
-        <div className="sheet-title">
-          {report.delegated_failed ? "Nothing was removed" : "Removal complete"}
-        </div>
-        <div className="sheet-strip">
-          <div>
-            <b>{moved.length}</b> <span className="muted">item(s) moved to the Trash</span>
-            {alreadyGone.length > 0 && (
-              <span className="muted">
-                {" · "}
-                {alreadyGone.length} already removed by the app's own uninstaller
-              </span>
-            )}
-          </div>
-          <b>{humanSize(report.bytes_freed)}</b>
-        </div>
-        <div className="sheet-body">
-          {report.delegated_failed && (
-            <div className="banner" style={{ margin: "4px 4px 12px" }}>
+      <div className="sheet" style={{ maxWidth: 640 }} role="dialog" aria-modal="true">
+        <div className="sheet-title">{headline}</div>
+
+        <div className="sheet-body" style={{ padding: 22 }}>
+          <div className={failed.length > 0 && moved.length === 0 ? "result-hero bad" : "result-hero"}>
+            {report.delegated_failed || (failed.length > 0 && moved.length === 0) ? (
               <IconWarn />
-              <div>
-                <strong>{report.delegated_failed}</strong>
-                Nothing was touched, because removing an app's files underneath its
-                own half-finished uninstaller usually leaves a worse mess than
-                stopping. If that uninstaller is simply broken, you can clear the
-                files anyway.
+            ) : (
+              <IconCheck />
+            )}
+            <div>
+              <div className="result-headline">
+                {moved.length > 0
+                  ? humanSize(report.bytes_freed)
+                  : report.delegated_failed
+                    ? "Not finished"
+                    : "Nothing to remove"}
               </div>
+              <div className="result-detail">{detail}</div>
             </div>
-          )}
+          </div>
+
           {failed.length > 0 && !report.delegated_failed && (
             <>
-              <div className="section-title" style={{ marginTop: 4, fontSize: 15 }}>
-                Not removed
-              </div>
-              {failed.map((o) => (
-                <div className="result-line bad" key={o.path}>
-                  <IconWarn />
-                  <div>
-                    <div className="item-path" style={{ color: "inherit" }}>{o.path}</div>
-                    <div>{o.error}</div>
+              <h2 className="section-title" style={{ fontSize: 14 }}>
+                {failed.length === 1 ? "One item was left alone" : `${failed.length} items were left alone`}
+              </h2>
+              <div className="table" style={{ padding: "2px 14px" }}>
+                {failed.map((o) => (
+                  <div className="result-line bad" key={o.path}>
+                    <IconWarn />
+                    <div style={{ minWidth: 0 }}>
+                      <div className="item-path" style={{ marginTop: 0, color: "inherit" }}>
+                        {o.path}
+                      </div>
+                      <div>{o.error}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </>
           )}
-          {failed.length === 0 && report.delegated_ran && !report.delegated_failed && (
-            <p style={{ color: "var(--muted)", padding: "8px 12px" }}>
-              The application's own uninstaller did the main work; anything it left
-              behind was moved to the Trash.
-              <br />
-              <br />
-              Your disk gets the space back when you empty the Trash.
-            </p>
-          )}
-          {failed.length === 0 && !report.delegated_ran && (
-            <p style={{ color: "var(--muted)", padding: "8px 12px" }}>
-              Everything selected was moved to the Trash. Nothing was deleted — you can
-              put it back from the History screen, or from the Trash itself.
-              <br />
-              <br />
-              Your disk gets the space back when you empty the Trash.
+
+          {moved.length > 0 && (
+            <p className="result-note">
+              Everything is in the {TRASH_NAME}, not deleted — put it back from the History
+              screen if you change your mind. Your disk gets the space back when you empty
+              the {TRASH_NAME}.
             </p>
           )}
         </div>
+
         <div className="sheet-foot" style={{ justifyContent: "flex-end", gap: 10 }}>
           {report.delegated_failed && (
             <button className="btn btn-ghost" onClick={onForce} disabled={busy}>
               {busy ? "Removing…" : "Remove the files anyway"}
             </button>
           )}
-          <button className="btn btn-primary" onClick={onClose}>Done</button>
+          <button className="btn btn-primary" onClick={onClose} disabled={busy}>
+            Done
+          </button>
         </div>
       </div>
     </div>

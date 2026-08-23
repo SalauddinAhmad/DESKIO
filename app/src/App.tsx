@@ -54,6 +54,10 @@ export default function App() {
   // was a bare piece of state.
   const [restoreResult, setRestoreResult] =
     useState<{ id: string; outcomes: RestoreOutcome[] } | null>(null);
+  // Bumped whenever something is actually removed. The views watch it to drop
+  // a selection that no longer exists — otherwise the detail pane keeps showing
+  // an app that has just been uninstalled, with an Uninstall button on it.
+  const [removalNonce, setRemovalNonce] = useState(0);
   const [settings, setSettings] = useState<Settings>({
     removal_sound: false,
     full_disk_prompt_seen: true,
@@ -271,11 +275,21 @@ export default function App() {
     try {
       const r = await api.executePlan(plan, force);
       setReport(r);
-      // Whatever moved is gone; re-read rather than trusting what we had.
-      api.listApps(true).then(setApps);
-      if (section === "remaining") api.orphanGroups(true).then(setOrphans);
-      if (section === "extensions") api.extensionGroups(true).then(setExtensions);
-      if (section === "cleanup") api.junkGroups(true).then(setJunk);
+      // Whatever moved is gone. Re-read the list, and empty every other
+      // section's cache so it reloads when next opened rather than showing
+      // something that is no longer there.
+      if (r.outcomes.some((o) => o.removed)) {
+        setRemovalNonce((n) => n + 1);
+        setOrphans([]);
+        setExtensions([]);
+        setJunk([]);
+        setStartup([]);
+        setUpdates([]);
+        api.listApps(true).then(setApps);
+        if (section === "remaining") api.orphanGroups(true).then(setOrphans);
+        if (section === "extensions") api.extensionGroups(true).then(setExtensions);
+        if (section === "cleanup") api.junkGroups(true).then(setJunk);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -381,6 +395,7 @@ export default function App() {
           icons={icons}
           banner={banner}
           loading={loading}
+          removalNonce={removalNonce}
           onUninstall={openPlanFor}
         />
       )}
