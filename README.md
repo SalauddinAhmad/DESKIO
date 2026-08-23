@@ -65,6 +65,8 @@ Five rules the whole app is built around:
 
 <p align="center">
   <img src="docs/screenshots/startup.png" width="49%" alt="Startup Programs" />
+  <img src="docs/screenshots/extensions.png" width="49%" alt="Extensions" />
+  <img src="docs/screenshots/remaining.png" width="49%" alt="Remaining Files" />
   <img src="docs/screenshots/cleanup.png" width="49%" alt="Cleanup" />
   <img src="docs/screenshots/updates.png" width="49%" alt="Updates" />
   <img src="docs/screenshots/history.png" width="49%" alt="History" />
@@ -122,6 +124,20 @@ and what is missed because of each.
 Without it the app still works. It reports unreadable folders as *size unknown*
 rather than pretending they are empty, and never offers to remove something it
 could not read.
+
+### If you granted it and BHUninstaller still says it has not got it
+
+**Remove the entry from the list entirely, then add it again.**
+
+BHUninstaller is ad-hoc signed rather than signed with an Apple developer
+certificate, so macOS identifies it by the exact build. Every update is a
+different build — and the old entry stays in the list, still switched on, while
+no longer applying to the app you are running.
+
+**Expect to do this after each update**, until the app is signed with a real
+Developer ID. Also note that macOS applies the permission per process: a grant
+made while BHUninstaller is running does not reach it, which is why the app
+offers to relaunch itself once it detects one.
 
 ## 🔨 Building
 
