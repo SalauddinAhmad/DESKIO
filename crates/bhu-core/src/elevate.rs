@@ -136,8 +136,9 @@ pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String>
     // Refuses an existing path, symlink included — see the macOS notes.
     std::fs::create_dir(&dest).map_err(|e| format!("could not prepare {}: {e}", dest.display()))?;
 
-    let work = std::env::temp_dir().join(format!("BHUninstaller-elevate-{}", std::process::id()));
-    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+    // The script below is run as Administrator, so where it is written matters
+    // as much as what it says. See `proc::private_temp_dir`.
+    let work = crate::proc::private_temp_dir("BHUninstaller-elevate")?;
 
     let list = work.join("paths.txt");
     {
@@ -240,8 +241,8 @@ pub fn registry_remove_elevated(keys: &[(String, PathBuf)]) -> Result<(), String
         crate::safety::check_registry_removable(key).map_err(|e| e.to_string())?;
     }
 
-    let work = std::env::temp_dir().join(format!("BHUninstaller-registry-{}", std::process::id()));
-    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+    // Run as Administrator — see `proc::private_temp_dir`.
+    let work = crate::proc::private_temp_dir("BHUninstaller-registry")?;
 
     // key<TAB>backup-file, one per line, UTF-8.
     let list = work.join("keys.txt");
@@ -277,6 +278,10 @@ Set-Content -LiteralPath $done -Value $ok -Encoding UTF8
     )
     .map_err(|e| e.to_string())?;
 
+    // Single-quoted PowerShell strings; a quote inside a path is escaped by
+    // doubling it, which is the only escape that form has. The temporary
+    // directory comes from the environment, so it is not assumed to be tame.
+    let q = |p: &std::path::Path| p.display().to_string().replace('\'', "''");
     let status = crate::proc::command("powershell")
         .args([
             "-NoProfile",
@@ -288,9 +293,9 @@ Set-Content -LiteralPath $done -Value $ok -Encoding UTF8
         .arg(format!(
             "$p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList \
              '-NoProfile','-ExecutionPolicy','Bypass','-File','{}','{}','{}'; exit $p.ExitCode",
-            script.display(),
-            list.display(),
-            done.display()
+            q(&script),
+            q(&list),
+            q(&done)
         ))
         .output()
         .map_err(|e| format!("could not start the elevated helper: {e}"))?;

@@ -234,8 +234,7 @@ fn icon_png(path: &Path) -> Option<String> {
     static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     // A per-process directory, so nothing can pre-place a symlink at a path
     // `sips` is about to write to.
-    let dir = std::env::temp_dir().join(format!("bhu-icons-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).ok()?;
+    let dir = crate::proc::private_temp_dir("bhu-icons").ok()?;
     let tmp = dir.join(format!(
         "icon-{}.png",
         N.fetch_add(1, std::sync::atomic::Ordering::Relaxed)

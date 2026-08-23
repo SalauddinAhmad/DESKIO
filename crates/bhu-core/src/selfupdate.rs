@@ -255,10 +255,11 @@ pub fn download(release: &Release) -> Result<PathBuf, String> {
         .read_to_vec()
         .map_err(|e| format!("download failed: {e}"))?;
 
-    // Per-process, so two runs cannot collide and nothing can pre-place a
-    // symlink at a path we are about to write to.
-    let dir = std::env::temp_dir().join(format!("BHUninstaller-update-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // This file is an installer the user will approve with their password, so
+    // it must not be possible for anything to have prepared the directory —
+    // or a symlink standing in for it — in advance. See
+    // `proc::private_temp_dir`.
+    let dir = crate::proc::private_temp_dir("BHUninstaller-update")?;
     // The name comes from GitHub, so it is not trusted as a path.
     let safe: String = name
         .chars()
@@ -281,7 +282,22 @@ pub fn download(release: &Release) -> Result<PathBuf, String> {
         .map_err(|e| format!("could not save the download: {e}"))?;
     std::io::Write::write_all(&mut file, &bytes)
         .map_err(|e| format!("could not save the download: {e}"))?;
+    if let Ok(mut last) = DOWNLOADED.lock() {
+        *last = Some(path.clone());
+    }
     Ok(path)
+}
+
+/// The file this process last downloaded.
+///
+/// Whatever launches the installer has to be certain it is running the download
+/// and not a path someone else chose. Comparing against this is exact; deriving
+/// the expected directory from the process id instead would accept any file
+/// that happened to be sitting in it.
+static DOWNLOADED: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+pub fn last_download() -> Option<PathBuf> {
+    DOWNLOADED.lock().ok().and_then(|l| l.clone())
 }
 
 #[cfg(test)]

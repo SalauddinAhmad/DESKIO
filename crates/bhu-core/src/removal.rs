@@ -397,8 +397,9 @@ fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), 
 fn run_delegated(command: &str, verify: Option<&std::path::Path>) -> Result<(), String> {
     use std::io::Write;
 
-    let work = std::env::temp_dir().join(format!("BHUninstaller-uninstall-{}", std::process::id()));
-    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+    // The `.cmd` written here is run elevated, so nothing may be able to put
+    // its own file at that path first. See `proc::private_temp_dir`.
+    let work = crate::proc::private_temp_dir("BHUninstaller-uninstall")?;
     let script = work.join("run.cmd");
     {
         let mut f = std::fs::File::create(&script).map_err(|e| e.to_string())?;

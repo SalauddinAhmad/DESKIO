@@ -294,12 +294,12 @@ pub fn icons(apps: &[InstalledApp]) -> HashMap<String, String> {
     }
 
     // A directory of our own, created fresh, so nothing can pre-place a file
-    // for us to read back as an icon.
-    let dir = std::env::temp_dir().join(format!("bhu-icons-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    if std::fs::create_dir_all(&dir).is_err() {
+    // for us to read back as an icon. See `proc::private_temp_dir`: removing
+    // and re-creating a fixed name is not the same thing, because the name is
+    // still known in advance.
+    let Ok(dir) = crate::proc::private_temp_dir("bhu-icons") else {
         return HashMap::new();
-    }
+    };
 
     let mut script = String::from(
         "$ErrorActionPreference='SilentlyContinue'\nAdd-Type -AssemblyName System.Drawing\n",

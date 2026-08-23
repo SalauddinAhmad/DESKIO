@@ -222,7 +222,11 @@ fn is_removable_installer(path: &Path) -> bool {
         return false;
     };
     let downloads = home.join("Downloads");
-    if path.parent() != Some(downloads.as_path()) {
+    if !path
+        .parent()
+        .map(|p| same_path(p, &downloads))
+        .unwrap_or(false)
+    {
         return false;
     }
     if !path.is_file() {
@@ -232,6 +236,31 @@ fn is_removable_installer(path: &Path) -> bool {
         .and_then(|e| e.to_str())
         .map(|e| INSTALLER_EXTENSIONS.contains(&e.to_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+/// Compare paths the way the filesystem does, not byte for byte.
+///
+/// `Path::eq` and `Path::starts_with` are case-sensitive. Windows filesystems
+/// are not, and neither is APFS as macOS ships it — so `c:\\windows\\system32`
+/// and `~/documents` name exactly the same directories as their capitalised
+/// forms while comparing as different strings. A blocklist that missed that
+/// could be walked straight past by re-casing a path.
+///
+/// The comparison is case-insensitive on every platform, including Linux where
+/// the filesystem really is case-sensitive. The cost there is refusing a
+/// leftover whose name differs from a protected folder only in case; the cost
+/// of the other choice is deleting the folder. This module's whole premise is
+/// that those two are not close.
+fn fold(p: &Path) -> String {
+    p.to_string_lossy().to_lowercase()
+}
+
+fn same_path(a: &Path, b: &Path) -> bool {
+    fold(a) == fold(b)
+}
+
+fn under(path: &Path, prefix: &Path) -> bool {
+    Path::new(&fold(path)).starts_with(Path::new(&fold(prefix)))
 }
 
 /// Minimum number of path components (excluding the root) a removable path must
@@ -275,8 +304,44 @@ pub fn check_removable(path: &Path) -> Result<(), SafetyError> {
         return Err(deny(path, "path contains a wildcard"));
     }
 
+    check_location(path)?;
+
+    // A path is only as trustworthy as the directories it passes through. If
+    // any of them is a symlink, what actually gets moved lives somewhere else
+    // entirely: `~/Library/Caches/Foo` can resolve into `~/Documents`, and
+    // every check above would have seen a perfectly ordinary cache path.
+    //
+    // This module's opening comment promises a symlink swapped between scan
+    // and execute is caught here, so resolve the parent and check the real
+    // destination too. Resolution failing is not suspicious — the path may
+    // simply be gone — and is left to the existence check at removal time.
+    if let Some(parent) = path.parent() {
+        if let Ok(real_parent) = parent.canonicalize() {
+            if !same_path(&real_parent, parent) {
+                let real = match path.file_name() {
+                    Some(name) => real_parent.join(name),
+                    None => real_parent,
+                };
+                if let Err(e) = check_location(&real) {
+                    return Err(deny(
+                        path,
+                        format!("this leads to {} — {}", real.display(), e.reason),
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// The protected-location rules, applied to one path.
+///
+/// Separate from [`check_removable`] so the same rules can be applied twice:
+/// once to the path as written, and once to where it actually resolves to.
+fn check_location(path: &Path) -> Result<(), SafetyError> {
     for p in protected_exact() {
-        if path == p {
+        if same_path(path, &p) {
             return Err(deny(path, "this is a system or standard user folder"));
         }
     }
@@ -284,11 +349,11 @@ pub fn check_removable(path: &Path) -> Result<(), SafetyError> {
     let installer = is_removable_installer(path);
     let exceptions = allowed_exceptions();
     for prefix in protected_prefixes() {
-        if path.starts_with(&prefix) {
+        if under(path, &prefix) {
             let excepted = installer
                 || exceptions
                     .iter()
-                    .any(|e| path.starts_with(e) && e.starts_with(&prefix));
+                    .any(|e| under(path, e) && under(e, &prefix));
             if !excepted {
                 return Err(deny(
                     path,
@@ -428,6 +493,66 @@ pub fn check_registry_removable(key: &str) -> Result<(), SafetyError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn protected_paths_are_refused_whatever_their_case() {
+        // Windows filesystems and APFS as macOS ships it are case-insensitive,
+        // so these name exactly the protected directories. Comparing byte for
+        // byte would have let every one of them through.
+        for p in [
+            r"c:\windows\system32\drivers\etc\hosts",
+            r"C:\PROGRAM FILES",
+            r"c:\program files\common files",
+            "/system/library/launchdaemons/com.apple.x.plist",
+            "/ETC/passwd",
+        ] {
+            assert!(
+                check_removable(Path::new(p)).is_err(),
+                "should have refused {p}"
+            );
+        }
+        let home = home();
+        for sub in ["documents/tax", "DOCUMENTS/tax", "Desktop/notes.txt"] {
+            let p = home.join(sub);
+            assert!(
+                check_removable(&p).is_err(),
+                "should have refused {}",
+                p.display()
+            );
+        }
+    }
+
+    #[test]
+    fn a_path_that_leads_into_a_protected_tree_is_refused() {
+        // The path itself looks like an ordinary cache entry. What it resolves
+        // to is the user's Documents folder.
+        let home = home();
+        let tmp = home.join(format!(".bhu-safety-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        let disguised = tmp.join("Caches");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(home.join("Documents"), &disguised).unwrap();
+        #[cfg(not(unix))]
+        {
+            let _ = &disguised;
+            return;
+        }
+
+        #[cfg(unix)]
+        {
+            let target = disguised.join("thesis.txt");
+            let err = check_removable(&target)
+                .expect_err("a path resolving into Documents must be refused");
+            assert!(
+                err.reason.contains("leads to"),
+                "unexpected reason: {}",
+                err.reason
+            );
+            let _ = std::fs::remove_dir_all(&tmp);
+        }
+    }
 
     fn home() -> PathBuf {
         dirs::home_dir().expect("home dir")

