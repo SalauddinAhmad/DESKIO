@@ -69,7 +69,9 @@ fn protected_exact() -> Vec<PathBuf> {
         r"C:\Windows",
         r"C:\Windows\System32",
         r"C:\Program Files",
+        r"C:\Program Files\Common Files",
         r"C:\Program Files (x86)",
+        r"C:\Program Files (x86)\Common Files",
         r"C:\ProgramData",
         r"C:\Users",
         r"C:\Users\Public",
@@ -251,8 +253,16 @@ fn is_removable_installer(path: &Path) -> bool {
 /// leftover whose name differs from a protected folder only in case; the cost
 /// of the other choice is deleting the folder. This module's whole premise is
 /// that those two are not close.
-fn fold(p: &Path) -> String {
-    p.to_string_lossy().to_lowercase()
+/// ⚠️ This has to stay a `Path`, not a `String`. `Path` treats `/` and `\\` as
+/// the same separator on Windows and ignores repeated and trailing ones;
+/// comparing the folded text instead would make `Library/Caches` and
+/// `Library\\Caches` different paths — which is exactly the kind of gap the
+/// folding was added to close, reintroduced one line lower down.
+fn fold(p: &Path) -> PathBuf {
+    let lowered = p.to_string_lossy().to_lowercase();
+    #[cfg(windows)]
+    let lowered = lowered.replace('/', "\\");
+    PathBuf::from(lowered)
 }
 
 fn same_path(a: &Path, b: &Path) -> bool {
@@ -260,7 +270,7 @@ fn same_path(a: &Path, b: &Path) -> bool {
 }
 
 fn under(path: &Path, prefix: &Path) -> bool {
-    Path::new(&fold(path)).starts_with(Path::new(&fold(prefix)))
+    fold(path).starts_with(fold(prefix))
 }
 
 /// Minimum number of path components (excluding the root) a removable path must
@@ -503,6 +513,7 @@ mod tests {
             r"c:\windows\system32\drivers\etc\hosts",
             r"C:\PROGRAM FILES",
             r"c:\program files\common files",
+            r"c:\program files (x86)\COMMON FILES",
             "/system/library/launchdaemons/com.apple.x.plist",
             "/ETC/passwd",
         ] {
@@ -522,36 +533,31 @@ mod tests {
         }
     }
 
+    // Creating a symlink on Windows needs a privilege the test runner does not
+    // have, so this one is a Unix test rather than a test with a hole in it.
+    #[cfg(unix)]
     #[test]
     fn a_path_that_leads_into_a_protected_tree_is_refused() {
-        // The path itself looks like an ordinary cache entry. What it resolves
-        // to is the user's Documents folder.
-        let home = home();
-        let tmp = home.join(format!(".bhu-safety-test-{}", std::process::id()));
+        // The path itself looks like an ordinary cache entry. Where it actually
+        // leads is a system directory.
+        let tmp = home().join(format!(".bhu-safety-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         std::fs::create_dir_all(&tmp).unwrap();
 
+        // `/etc` rather than `~/Documents`: the destination has to really exist
+        // for the path to resolve at all, and a CI runner's home directory has
+        // none of the standard folders in it.
         let disguised = tmp.join("Caches");
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(home.join("Documents"), &disguised).unwrap();
-        #[cfg(not(unix))]
-        {
-            let _ = &disguised;
-            return;
-        }
+        std::os::unix::fs::symlink("/etc", &disguised).unwrap();
 
-        #[cfg(unix)]
-        {
-            let target = disguised.join("thesis.txt");
-            let err = check_removable(&target)
-                .expect_err("a path resolving into Documents must be refused");
-            assert!(
-                err.reason.contains("leads to"),
-                "unexpected reason: {}",
-                err.reason
-            );
-            let _ = std::fs::remove_dir_all(&tmp);
-        }
+        let err = check_removable(&disguised.join("passwd"))
+            .expect_err("a path resolving into a protected tree must be refused");
+        assert!(
+            err.reason.contains("leads to"),
+            "unexpected reason: {}",
+            err.reason
+        );
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     fn home() -> PathBuf {
