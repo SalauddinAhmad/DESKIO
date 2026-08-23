@@ -207,12 +207,14 @@ function ResultView({
   } else {
     const count = `${moved.length} item${moved.length === 1 ? "" : "s"}`;
     headline = name ? `${name} was removed` : `${count} removed`;
+    // "freeing Zero KB" is the same confusion as the headline had: it reads as
+    // though nothing happened. When there is no size worth reporting, the
+    // clause is simply left off.
+    const freed = report.bytes_freed > 0 ? `, freeing ${humanSize(report.bytes_freed)}` : "";
     if (report.delegated_ran) {
-      detail = `Its own uninstaller removed the application. BHUninstaller cleared ${count} it left behind, freeing ${humanSize(
-        report.bytes_freed
-      )}.`;
+      detail = `Its own uninstaller removed the application. BHUninstaller cleared ${count} it left behind${freed}.`;
     } else {
-      detail = `${count} moved to the Trash, freeing ${humanSize(report.bytes_freed)}.`;
+      detail = `${count} moved to the ${TRASH_NAME}${freed}.`;
     }
     if (failed.length === 0) {
       detail += " Nothing was left behind.";
@@ -234,7 +236,9 @@ function ResultView({
             <div>
               <div className="result-headline">
                 {moved.length > 0
-                  ? humanSize(report.bytes_freed)
+                  ? report.bytes_freed > 0
+                    ? humanSize(report.bytes_freed)
+                    : "Zero KB remaining"
                   : report.delegated_failed
                     ? "Not finished"
                     : "Nothing to remove"}
