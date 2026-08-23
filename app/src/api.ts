@@ -270,3 +270,14 @@ export const TRASH_NAME =
   typeof navigator !== "undefined" && /Win/i.test(navigator.platform ?? "")
     ? "Recycle Bin"
     : "Trash";
+
+/** A size for an installed application.
+ *
+ *  An app that really occupies no space does not exist, so a zero here always
+ *  means the size could not be determined — on Windows, an install location the
+ *  registry does not record and a size it does not estimate. Printing
+ *  "Zero KB" for that is worse than admitting we do not know.
+ */
+export function appSize(bytes: number): string {
+  return bytes > 0 ? humanSize(bytes) : "—";
+}

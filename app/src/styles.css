@@ -71,6 +71,20 @@ button { font: inherit; color: inherit; cursor: default; }
   align-items: center;
   padding: 42px 8px 16px;
   gap: 6px;
+  /* Last resort: on a very short window the rail scrolls rather than having
+     its last items clipped off the bottom. */
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.rail::-webkit-scrollbar { display: none; }
+
+/* Short screens — a 768-pixel laptop leaves about 700 usable points. */
+@media (max-height: 740px) {
+  .rail { padding-top: 34px; gap: 1px; }
+  .rail-item { padding: 8px 4px 7px; font-size: 10.5px; }
+  .rail-item svg { width: 22px; height: 22px; }
+  .rail-brand { font-size: 10px; }
+  .list-head { padding-top: 32px; }
 }
 
 .rail-item {

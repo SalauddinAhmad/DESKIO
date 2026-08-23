@@ -1,7 +1,7 @@
 /** Applications: the list of what is installed, and the detail pane. */
 import { useEffect, useMemo, useState } from "react";
 import type { InstalledApp } from "../types";
-import { api, formatDate, formatDay, humanSize } from "../api";
+import { api, appSize, formatDate, formatDay } from "../api";
 import { ArtEmpty, IconSearch } from "./icons";
 
 type Sort = "name" | "size" | "newest";
@@ -109,7 +109,7 @@ export function AppsView({
                 <div className="card-name">{app.name}</div>
                 <div className="card-sub">{formatDay(app.modified_at)}</div>
               </div>
-              <div className="card-size">{humanSize(app.size_bytes)}</div>
+              <div className="card-size">{appSize(app.size_bytes)}</div>
             </button>
           ))}
         </div>
@@ -131,7 +131,7 @@ export function AppsView({
                 <div className="hero-main">
                   <div className="hero-name-row">
                     <div className="hero-name">{view.name}</div>
-                    <div className="hero-size">{humanSize(view.size_bytes)}</div>
+                    <div className="hero-size">{appSize(view.size_bytes)}</div>
                   </div>
                   <dl className="hero-rows">
                     <div className="hero-row">

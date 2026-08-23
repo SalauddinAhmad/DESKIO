@@ -71,15 +71,20 @@ fn read_entry(key: &RegKey, key_name: &str, opts: ScanOptions) -> Option<Install
         .map(PathBuf::from)
         .filter(|p| p.exists());
 
+    // Two ways to get a size, and both fail often enough that neither can be
+    // trusted alone: `InstallLocation` may be missing, wrong, or point at a
+    // directory this process cannot read, and `EstimatedSize` may be absent or
+    // stale. Measuring is preferred, the registry's own figure is the fallback,
+    // and the larger wins when a walk was cut short by permissions — which is
+    // how apps like Android Studio ended up reporting nothing at all.
     let size_bytes = if opts.compute_sizes {
-        match &install_location {
-            Some(path) => fsutil::size_on_disk(path),
-            // EstimatedSize is in KB and frequently stale, but it is better
-            // than reporting nothing at all.
-            None => dword("EstimatedSize")
-                .map(|kb| kb as u64 * 1024)
-                .unwrap_or(0),
-        }
+        let walked = install_location
+            .as_ref()
+            .map(|path| fsutil::size_on_disk(path))
+            .unwrap_or(0);
+        // EstimatedSize is recorded in kibibytes.
+        let estimated = dword("EstimatedSize").map(|kb| kb as u64 * 1024).unwrap_or(0);
+        walked.max(estimated)
     } else {
         0
     };

@@ -19,7 +19,7 @@ use bhu_core::{discovery, leftovers, removal};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{Manager, State};
 
 /// Scans are expensive, so the results are kept for the lifetime of the window.
 /// The app list in particular is needed by every leftover scan, since knowing
@@ -451,8 +451,66 @@ fn engine_version() -> String {
     bhu_core::VERSION.to_string()
 }
 
+
+/// Keep the window inside the part of the screen that is actually usable.
+///
+/// A window is positioned against the whole monitor, but the taskbar, dock or
+/// panel takes a slice of it. Centring a 700-point window on a 768-point screen
+/// leaves its bottom edge behind the Windows taskbar — which is where the
+/// sidebar's last items were disappearing to.
+///
+/// So the size is clamped to the work area rather than the monitor, decorations
+/// included, and the window is centred within that area instead.
+fn fit_to_work_area(window: &tauri::WebviewWindow) {
+    let Ok(Some(monitor)) = window.current_monitor() else {
+        return;
+    };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let (area_w, area_h) = (
+        area.size.width as f64 / scale,
+        area.size.height as f64 / scale,
+    );
+    let (area_x, area_y) = (
+        area.position.x as f64 / scale,
+        area.position.y as f64 / scale,
+    );
+
+    let (Ok(outer), Ok(inner)) = (window.outer_size(), window.inner_size()) else {
+        return;
+    };
+    // The title bar and borders count against the space available.
+    let deco_w = outer.width.saturating_sub(inner.width) as f64 / scale;
+    let deco_h = outer.height.saturating_sub(inner.height) as f64 / scale;
+
+    // A margin so the window never sits flush against an edge.
+    const MARGIN: f64 = 24.0;
+    let want_w = inner.width as f64 / scale;
+    let want_h = inner.height as f64 / scale;
+    let w = want_w.min((area_w - MARGIN - deco_w).max(320.0));
+    let h = want_h.min((area_h - MARGIN - deco_h).max(320.0));
+
+    if w < want_w || h < want_h {
+        let _ = window.set_size(tauri::LogicalSize::new(w, h));
+    }
+    let _ = window.set_position(tauri::LogicalPosition::new(
+        area_x + (area_w - (w + deco_w)) / 2.0,
+        area_y + (area_h - (h + deco_h)) / 2.0,
+    ));
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            // The window starts hidden so this happens before it is ever seen —
+            // resizing it in front of the user would look like a glitch.
+            if let Some(window) = app.get_webview_window("main") {
+                fit_to_work_area(&window);
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .manage(Cache::default())
         .invoke_handler(tauri::generate_handler![
