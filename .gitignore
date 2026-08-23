@@ -1,6 +1,7 @@
 target/
 node_modules/
 dist/
+dist.noindex/
 .DS_Store
 *.pkg
 *.dmg
