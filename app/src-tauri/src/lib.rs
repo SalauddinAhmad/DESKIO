@@ -320,6 +320,32 @@ fn full_disk_access() -> bool {
     bhu_core::access::report().granted
 }
 
+/// Open the system settings pane where Full Disk Access is granted.
+///
+/// Not done through the opener plugin: its default permission covers `http`,
+/// `https`, `mailto` and `tel` only, so a `x-apple.systempreferences:` URL is
+/// refused — silently, from the interface's point of view, which is exactly how
+/// this button came to do nothing at all. Widening that scope would allow the
+/// frontend to open any scheme; this command takes no arguments and can only
+/// ever open the one pane.
+#[tauri::command]
+fn open_privacy_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut last = String::from("no settings pane could be opened");
+        for url in bhu_core::access::SETTINGS_URLS {
+            match bhu_core::proc::command("/usr/bin/open").arg(url).status() {
+                Ok(status) if status.success() => return Ok(()),
+                Ok(status) => last = format!("open exited with {status}"),
+                Err(e) => last = e.to_string(),
+            }
+        }
+        Err(last)
+    }
+    #[cfg(not(target_os = "macos"))]
+    Err("this setting only exists on macOS".into())
+}
+
 /// Relaunch, so a newly granted permission takes effect.
 ///
 /// macOS decides Full Disk Access per process: a grant made while the app is
@@ -533,6 +559,7 @@ pub fn run() {
             set_settings,
             full_disk_access,
             access_report,
+            open_privacy_settings,
             relaunch,
             can_restore,
             engine_version,

@@ -20,7 +20,19 @@ interface Props {
 
 export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
   const [checking, setChecking] = useState(false);
+  const [openFailed, setOpenFailed] = useState(false);
   const [latest, setLatest] = useState(report);
+
+  // If the pane cannot be opened, say so and give the steps — a button that
+  // quietly does nothing is worse than one that admits it failed.
+  const openSettings = async () => {
+    setOpenFailed(false);
+    try {
+      await api.openPrivacySettings();
+    } catch {
+      setOpenFailed(true);
+    }
+  };
 
   const recheck = async () => {
     setChecking(true);
@@ -114,6 +126,17 @@ export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
             <li>Come back here and press <b>Check again</b>.</li>
           </ol>
 
+          {openFailed && (
+            <div className="banner" style={{ margin: "18px 0 0", color: "var(--danger)" }}>
+              <IconWarn />
+              <div>
+                <strong>System Settings did not open</strong>
+                Open it yourself: <b>System Settings › Privacy &amp; Security › Full Disk
+                Access</b>, then come back and press Check again.
+              </div>
+            </div>
+          )}
+
           <div className="banner" style={{ margin: "18px 0 0" }}>
             <IconWarn />
             <div>
@@ -134,14 +157,7 @@ export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
             <button className="btn btn-ghost" onClick={recheck} disabled={checking}>
               {checking ? "Checking…" : "Check again"}
             </button>
-            <button
-              className="btn btn-primary"
-              onClick={() =>
-                api.openUrl(
-                  "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
-                )
-              }
-            >
+            <button className="btn btn-primary" onClick={openSettings}>
               Open Privacy &amp; Security
             </button>
           </div>

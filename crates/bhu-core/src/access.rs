@@ -121,9 +121,13 @@ pub fn report() -> AccessReport {
     }
 }
 
-/// The System Settings pane where the permission is granted.
+/// The System Settings panes where the permission is granted, newest first.
 ///
 /// There is no API to request Full Disk Access; opening the pane and explaining
-/// the steps is the whole of what an app is permitted to do.
-pub const SETTINGS_URL: &str =
-    "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles";
+/// the steps is the whole of what an app is permitted to do. The pane's
+/// identifier changed when System Preferences became System Settings, so both
+/// are tried — an older macOS does not know the new one.
+pub const SETTINGS_URLS: &[&str] = &[
+    "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles",
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+];

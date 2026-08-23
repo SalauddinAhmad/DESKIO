@@ -213,6 +213,11 @@ export const api = {
     return call("access_report");
   },
 
+  async openPrivacySettings(): Promise<void> {
+    if (!IS_TAURI) return;
+    return call("open_privacy_settings");
+  },
+
   async relaunch(): Promise<void> {
     if (!IS_TAURI) return;
     return call("relaunch");
