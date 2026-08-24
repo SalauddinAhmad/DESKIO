@@ -65,8 +65,20 @@ runners, which is where the foreign adapters actually get compiled.
 
 ## What is not finished
 
-**Linux has never been run by anyone.** It compiles and produces a `.deb` and
-`.rpm` in CI. Nothing more is known about it.
+**Linux has been run, but only narrowly.** Verified on Ubuntu 24.04 (arm64, a
+VM on an Apple-silicon Mac): the Applications list from `dpkg` and `snap` with
+names, icons, sizes and dates, and one snap removed through `pkexec` with the
+desktop's own password prompt.
+
+Not run at all: removal through `apt`, `dnf`, `pacman`, flatpak or an AppImage;
+Startup Programs; Extensions; Cleanup; Remaining Files; restoring from History.
+And only arm64 — the x86_64 packages are built but nobody has launched one.
+
+Two things worth knowing before working on it. `sudo` is useless from a
+windowed application — there is no tty for it to ask in, so elevation goes
+through `pkexec`, and the password is collected by polkit and never by this app.
+And `apt` and `dnf` will stop to ask for confirmation of a terminal that does
+not exist, so their non-interactive flags are not optional.
 
 **Windows is being tested but is young.** These paths in particular are written
 and have not been confirmed working:

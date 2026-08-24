@@ -12,7 +12,7 @@ which apps have updates, and put any removal back. 100% open-source.
 |----------|--------|
 | 🍎 **macOS** | ✅ **Stable** — Apple Silicon + Intel, used daily |
 | 🪟 **Windows** | ✅ **Working** — uninstall tested on Windows 11; some parts still new |
-| 🐧 **Linux** | 🟡 **Written, untested** — compiles in CI, never run |
+| 🐧 **Linux** | ✅ **Working** — list and uninstall tested on Ubuntu 24.04; some parts still new |
 
 > 🟢 Runs the author's daily Mac. Nothing is ever deleted — every removal moves
 > to the Trash, behind a review sheet showing every path and why it matched.
@@ -106,11 +106,16 @@ about:
   confirmation screen. **Registry leftovers are new in 0.2.0 and have not been
   run.** Startup Programs, Extensions, Cleanup and restoring from History have
   had less attention there than they have on macOS.
-- **Linux** — nothing. It compiles and is built in CI, and that is all that is
-  known about it.
+- **Linux** — the Applications list and uninstalling, on Ubuntu 24.04 (arm64):
+  packages and snaps with their names, icons, sizes and dates, and a snap
+  removed through the desktop's own password prompt. **Only a snap has been
+  removed** — the `apt`, `dnf`, `pacman`, flatpak and AppImage paths are written
+  but have not been run. Startup Programs, Extensions, Cleanup, Remaining Files
+  and restoring from History have had no attention there at all, and only arm64
+  has been tried.
 
-If you are on Linux, or trying the newer Windows parts, start with the read-only
-views. `bhu list`, `bhu plan <app>`, `bhu orphans` and `bhu cleanup` change
+If you are trying one of the parts above that has not been run, start with the
+read-only views. `bhu list`, `bhu plan <app>`, `bhu orphans` and `bhu cleanup` change
 nothing at all, and the review sheet shows you the whole plan before anything
 moves. [Reports are welcome](https://github.com/wpexpertinbd/BHUninstaller/issues).
 
