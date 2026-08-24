@@ -71,8 +71,10 @@ export const IconShield = () => (
 
 /** The illustration on empty right-hand panes. */
 export const ArtEmpty = () => (
-  <svg viewBox="0 0 120 120" className="empty-art" {...s} width={80} height={80} strokeWidth={2.2}>
-    <rect x="30" y="18" width="60" height="44" rx="10" />
-    <path d="M36 78h48M44 92h32M52 106h16" strokeOpacity=".6" />
+  <svg viewBox="0 0 120 120" className="empty-art" width={80} height={80} fill="none" stroke="currentColor">
+    <rect x="25" y="25" width="70" height="70" rx="16" strokeWidth="2.5" strokeOpacity="0.15" fill="#f8fafc" />
+    <path d="M40 50h40M40 65h25M40 80h15" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.3" />
+    <circle cx="85" cy="85" r="14" fill="#6366f1" fillOpacity="0.1" stroke="#6366f1" strokeWidth="2.5" />
+    <path d="m95 95 6 6" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
   </svg>
 );
