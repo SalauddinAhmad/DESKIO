@@ -6,10 +6,10 @@
 ; effect. The hook macros themselves are guarded with !ifmacrodef upstream, so
 ; none need to be defined here.
 
-!define MUI_WELCOMEPAGE_TITLE "Welcome to BHUninstaller"
+!define MUI_WELCOMEPAGE_TITLE "Welcome to DESKIO"
 
 !define MUI_WELCOMEPAGE_TEXT "Uninstall apps properly, and clean up what they leave behind - a free alternative to Revo Uninstaller and App Cleaner.$\r$\n$\r$\n\
-This installs BHUninstaller on your PC. It can:$\r$\n$\r$\n\
+This installs DESKIO on your PC. It can:$\r$\n$\r$\n\
       -   Uninstall any app, and sweep up the files it leaves behind$\r$\n\
       -   Find leftovers from apps you removed long ago$\r$\n\
       -   Manage what runs at startup, and your browser and system extensions$\r$\n\

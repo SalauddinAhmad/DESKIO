@@ -78,7 +78,7 @@ export function HistoryView({ entries, loading, busyId, result, onRestore }: Pro
             <ArtEmpty />
             <h2>History</h2>
             <p>
-              Everything BHUninstaller has removed, with where each item came from.
+              Everything DESKIO has removed, with where each item came from.
               Select a removal to look through it or put it back.
             </p>
           </div>
@@ -140,7 +140,7 @@ export function HistoryView({ entries, loading, busyId, result, onRestore }: Pro
                   <IconWarn />
                   <div>
                     {itemsOf(focused).every((i) => i.trashed === null)
-                      ? "This removal predates BHUninstaller recording where items went, so it cannot put them back for you. Anything still in the Trash can be moved out of it by hand — the original paths are listed below."
+                      ? "This removal predates DESKIO recording where items went, so it cannot put them back for you. Anything still in the Trash can be moved out of it by hand — the original paths are listed below."
                       : "Nothing from this removal is in the Trash any more — it was either already put back or the Trash has been emptied."}
                   </div>
                 </div>

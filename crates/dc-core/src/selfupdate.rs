@@ -1,4 +1,4 @@
-//! Checking GitHub for a newer BHUninstaller.
+//! Checking GitHub for a newer DESKIO.
 //!
 //! Deliberately modest: it looks at the project's own releases page, compares
 //! version numbers, and hands the user the download. It does not install
@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const REPO: &str = "wpexpertinbd/BHUninstaller";
+const REPO: &str = "deskio/deskio";
 const ALLOWED_HOSTS: &[&str] = &["github.com", "objects.githubusercontent.com"];
 
 /// How long to leave between automatic checks.
@@ -74,7 +74,7 @@ fn agent() -> ureq::Agent {
         // than a failure. Without this ureq turns it into an error and the user
         // is told the check broke.
         .http_status_as_error(false)
-        .user_agent(concat!("BHUninstaller/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("DESKIO/", env!("CARGO_PKG_VERSION")))
         .build()
         .new_agent()
 }
@@ -229,7 +229,7 @@ pub fn download(release: &Release) -> Result<PathBuf, String> {
     let name = release
         .asset_name
         .as_deref()
-        .unwrap_or("BHUninstaller-update");
+        .unwrap_or("DESKIO-update");
 
     if !host_allowed(url) {
         return Err("that download is not hosted on GitHub — refusing it".into());
@@ -259,7 +259,7 @@ pub fn download(release: &Release) -> Result<PathBuf, String> {
     // it must not be possible for anything to have prepared the directory —
     // or a symlink standing in for it — in advance. See
     // `proc::private_temp_dir`.
-    let dir = crate::proc::private_temp_dir("BHUninstaller-update")?;
+    let dir = crate::proc::private_temp_dir("DESKIO-update")?;
     // The name comes from GitHub, so it is not trusted as a path.
     let safe: String = name
         .chars()

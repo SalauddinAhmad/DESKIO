@@ -1,4 +1,4 @@
-//! Tauri host for BHUninstaller.
+//! Tauri host for DESKIO.
 //!
 //! Every command here is a thin wrapper over `bhu-core`. No scanning logic, no
 //! safety rules and no matching live in this crate — that all belongs to the
@@ -415,7 +415,7 @@ fn can_restore() -> bool {
     dc_core::trash_bin::can_restore_programmatically()
 }
 
-/// Look for a newer BHUninstaller.
+/// Look for a newer DESKIO.
 ///
 /// `force` is a manual check and always runs. Without it the check only
 /// happens when enabled and when a day has passed.
@@ -452,7 +452,7 @@ fn download_app_update(release: Release) -> Result<String, String> {
     dc_core::selfupdate::download(&release).map(|p| p.to_string_lossy().to_string())
 }
 
-/// Start the downloaded installer and close BHUninstaller.
+/// Start the downloaded installer and close DESKIO.
 ///
 /// The app has to be gone before an installer can replace it — on Windows the
 /// installer simply refuses while it is running — so this launches it and then
@@ -652,7 +652,7 @@ pub fn run() {
             install_update,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running BHUninstaller");
+        .expect("error while running DESKIO");
 }
 
 #[cfg(test)]

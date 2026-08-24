@@ -2,7 +2,7 @@
 //!
 //! Every executed removal is recorded before the UI forgets about it: what was
 //! removed, and where in the trash it landed. That second part is what lets
-//! BHUninstaller restore a removal itself, rather than depending on Finder's
+//! DESKIO restore a removal itself, rather than depending on Finder's
 //! "Put Back" — which is unavailable when items are trashed silently, and never
 //! worked for the items that needed an administrator password.
 
@@ -62,9 +62,9 @@ impl UndoEntry {
     }
 }
 
-/// `~/Library/Application Support/BHUninstaller` (or the platform equivalent).
+/// `~/Library/Application Support/DESKIO` (or the platform equivalent).
 pub fn data_dir() -> Option<PathBuf> {
-    dirs::data_dir().map(|d| d.join("BHUninstaller"))
+    dirs::data_dir().map(|d| d.join("DESKIO"))
 }
 
 fn journal_path() -> Option<PathBuf> {

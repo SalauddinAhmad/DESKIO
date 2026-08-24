@@ -1,13 +1,13 @@
 # Security
 
-BHUninstaller removes files. A bug in it costs someone their data, so security
+DESKIO removes files. A bug in it costs someone their data, so security
 reports are welcome and taken seriously.
 
 ## Reporting
 
 Please report privately rather than opening a public issue:
 
-- GitHub's [private vulnerability reporting](https://github.com/wpexpertinbd/BHUninstaller/security/advisories/new)
+- GitHub's [private vulnerability reporting](https://github.com/deskio/deskio/security/advisories/new)
 - or email **benjamin dot biswas at gmail dot com**
 
 Please include what you did, what happened, and which version and platform.
@@ -15,7 +15,7 @@ A proof of concept helps, but a clear description is enough.
 
 ## What counts
 
-Anything that could make BHUninstaller remove, expose or damage something it
+Anything that could make DESKIO remove, expose or damage something it
 should not. Particularly:
 
 - **A path that escapes the safety blocklist** — anything under a protected tree

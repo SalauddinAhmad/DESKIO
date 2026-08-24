@@ -19,7 +19,7 @@ pub struct Settings {
     ///
     /// The trade-off is real, and the UI says so: only the Finder route records
     /// the information behind Finder's "Put Back". With this off, restoring is
-    /// done from BHUninstaller's own removal history, which knows where every
+    /// done from DESKIO's own removal history, which knows where every
     /// item came from.
     pub removal_sound: bool,
     /// Whether the Full Disk Access explanation has been shown once.
@@ -29,7 +29,7 @@ pub struct Settings {
     /// that re-asks for a permission this broad on every launch teaches people
     /// to dismiss it without reading.
     pub full_disk_prompt_seen: bool,
-    /// Look for a newer BHUninstaller on its own, once a day at most.
+    /// Look for a newer DESKIO on its own, once a day at most.
     ///
     /// Off unless asked for. A tool that reaches out to the network without
     /// being told to is not what someone installs an uninstaller expecting,

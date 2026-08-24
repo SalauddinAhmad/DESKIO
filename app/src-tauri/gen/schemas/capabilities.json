@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Capabilities for the BHUninstaller window.","local":true,"windows":["main"],"permissions":["core:default","opener:default"]}}
+{"default":{"identifier":"default","description":"Capabilities for the DESKIO window.","local":true,"windows":["main"],"permissions":["core:default","opener:default"]}}

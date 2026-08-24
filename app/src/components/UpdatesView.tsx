@@ -150,7 +150,7 @@ export function UpdatesView({ updates, banner, loading, checkedApps, onRecheck }
               <div className="banner" style={{ margin: "20px 0 0" }}>
                 <IconWarn />
                 <div>
-                  <strong>BHUninstaller does not install updates</strong>
+                  <strong>DESKIO does not install updates</strong>
                   It tells you what is available and sends you to the developer. Running
                   an installer on your behalf is a much bigger promise than moving files
                   to the Trash, and not one this app makes.

@@ -199,7 +199,7 @@ export function CleanupView({ groups, banner, loading, onClean }: Props) {
                 >
                   <IconWarn />
                   <div>
-                    BHUninstaller will not empty your Trash. It is the one action with no
+                    DESKIO will not empty your Trash. It is the one action with no
                     undo, so it stays with you and Finder.
                   </div>
                 </div>

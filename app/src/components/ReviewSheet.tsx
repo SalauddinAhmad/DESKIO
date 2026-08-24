@@ -108,7 +108,7 @@ export function ReviewSheet(props: Props) {
               <div>
                 <strong>Some items need an administrator password</strong>
                 They sit outside your home folder. They will be moved into a dated
-                BHUninstaller folder in your Trash, which you can open and inspect.
+                DESKIO folder in your Trash, which you can open and inspect.
                 Finder's "Put Back" will not work for those — the removal history keeps
                 a record of where each one came from.
               </div>
@@ -226,7 +226,7 @@ function ResultView({
     // clause is simply left off.
     const freed = report.bytes_freed > 0 ? `, freeing ${humanSize(report.bytes_freed)}` : "";
     if (report.delegated_ran) {
-      detail = `Its own uninstaller removed the application. BHUninstaller cleared ${count} it left behind${freed}.`;
+      detail = `Its own uninstaller removed the application. DESKIO cleared ${count} it left behind${freed}.`;
     } else {
       detail = `${count} moved to the ${TRASH_NAME}${freed}.`;
     }

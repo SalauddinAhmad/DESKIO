@@ -1,4 +1,4 @@
-//! Headless driver for the BHUninstaller engine.
+//! Headless driver for the DESKIO engine.
 //!
 //! Its real job is verification: the engine's judgement about what belongs to
 //! what has to be checked against a real machine's `~/Library`, and reading that

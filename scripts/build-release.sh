@@ -16,13 +16,12 @@ cd "$(dirname "$0")/.."
 mkdir -p target && touch target/.metadata_never_index
 
 echo "==> Engine"
-cargo build --release
-cargo test --workspace --exclude bhuninstaller
+cargo test --workspace --exclude deskio
 
 echo "==> App"
 (cd app && npm run tauri build)
 
-APP="target/release/bundle/macos/BHUninstaller.app"
+APP="target/release/bundle/macos/DESKIO.app"
 
 # The ad-hoc signature must be applied LAST. Tauri edits the bundle after
 # signing it, which leaves the signature stale — and a stale signature reads as
@@ -44,7 +43,7 @@ mkdir -p dist.noindex
 touch dist.noindex/.metadata_never_index
 cp target/release/bundle/dmg/*.dmg dist.noindex/
 cp -R "$APP" dist.noindex/
-cp target/release/bhu dist.noindex/ 2>/dev/null || true
+cp target/release/deskio dist.noindex/ 2>/dev/null || true
 
 cargo clean
 

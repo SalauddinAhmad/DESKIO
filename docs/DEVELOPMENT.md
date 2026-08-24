@@ -1,4 +1,4 @@
-# Working on BHUninstaller
+# Working on DESKIO
 
 Notes for anyone building or extending this — including the platform work that
 is still outstanding.
@@ -6,8 +6,8 @@ is still outstanding.
 ## Getting set up
 
 ```bash
-git clone https://github.com/wpexpertinbd/BHUninstaller.git
-cd BHUninstaller
+git clone https://github.com/deskio/deskio.git
+cd deskio
 
 cargo build --release        # engine + CLI
 cargo test                   # 48 tests, no platform setup needed
@@ -83,7 +83,7 @@ not exist, so their non-interactive flags are not optional.
 **Windows is being tested but is young.** These paths in particular are written
 and have not been confirmed working:
 
-- `elevate.rs` — the elevated quarantine under `%LOCALAPPDATA%\BHUninstaller\Quarantine`
+- `elevate.rs` — the elevated quarantine under `%LOCALAPPDATA%\DESKIO\Quarantine`
 - `removal.rs::run_delegated` — running an uninstaller with administrator rights
 - **registry leftovers** — scanning, exporting and deleting keys, and the
   elevated batch for `HKLM`. Read the safety rules in `safety.rs`

@@ -1,4 +1,4 @@
-//! # BHUninstaller engine
+//! # DESKIO engine
 //!
 //! Finds installed applications, works out what they have left scattered around
 //! the system, and removes both — safely, reversibly, and only after the user

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    bhuninstaller_lib::run()
+    deskio_lib::run()
 }

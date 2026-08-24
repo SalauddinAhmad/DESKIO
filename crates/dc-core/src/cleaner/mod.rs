@@ -67,7 +67,7 @@ impl JunkCategory {
                  regenerated the next time you build."
             }
             JunkCategory::Trash => {
-                "Already in the Trash. BHUninstaller does not empty it — that is the one \
+                "Already in the Trash. DESKIO does not empty it — that is the one \
                  action with no undo, and it belongs to you and Finder."
             }
         }

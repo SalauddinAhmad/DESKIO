@@ -1,4 +1,4 @@
-/** A newer BHUninstaller is available.
+/** A newer DESKIO is available.
  *
  *  The app downloads it and hands it to the file manager. It does not install
  *  anything by itself: an updater that replaces the running binary without
@@ -39,7 +39,7 @@ export function AppUpdateSheet({ check, onClose }: Props) {
   return (
     <div className="sheet-backdrop">
       <div className="sheet" style={{ maxWidth: 620 }} role="dialog" aria-modal="true">
-        <div className="sheet-title">BHUninstaller {release.version} is available</div>
+        <div className="sheet-title">DESKIO {release.version} is available</div>
 
         <div className="sheet-body" style={{ padding: 22 }}>
           <div className="fda-hero fda-hero-ok">
@@ -70,7 +70,7 @@ export function AppUpdateSheet({ check, onClose }: Props) {
               <IconCheck />
               <div>
                 <strong>Downloaded — starting the installer</strong>
-                BHUninstaller will close in a moment so the installer can replace it.
+                DESKIO will close in a moment so the installer can replace it.
                 Reopen it when the install finishes.
               </div>
             </div>

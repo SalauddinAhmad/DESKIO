@@ -38,7 +38,7 @@ pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String>
     // so a collision is refused rather than followed; the suffix makes
     // arranging one impractical in the first place.
     let dest = trash.join(format!(
-        "BHUninstaller {stamp} ({}-{})",
+        "DESKIO {stamp} ({}-{})",
         std::process::id(),
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -101,7 +101,7 @@ end run"#;
 /// move rather than a delete, and a folder the user can open and pick through.
 ///
 /// Windows has no supported way to put a file in the Recycle Bin as another
-/// user, so the quarantine lives under `%LOCALAPPDATA%\BHUninstaller\Quarantine`
+/// user, so the quarantine lives under `%LOCALAPPDATA%\DESKIO\Quarantine`
 /// instead — still the user's own space, still recoverable, and the removal
 /// history records where everything came from.
 ///
@@ -121,7 +121,7 @@ pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String>
         .map(PathBuf::from)
         .ok_or("no local application data directory")?;
 
-    let root = local.join("BHUninstaller").join("Quarantine");
+    let root = local.join("DESKIO").join("Quarantine");
     std::fs::create_dir_all(&root)
         .map_err(|e| format!("could not prepare {}: {e}", root.display()))?;
 
@@ -138,7 +138,7 @@ pub fn trash_elevated(paths: &[PathBuf], stamp: &str) -> Result<PathBuf, String>
 
     // The script below is run as Administrator, so where it is written matters
     // as much as what it says. See `proc::private_temp_dir`.
-    let work = crate::proc::private_temp_dir("BHUninstaller-elevate")?;
+    let work = crate::proc::private_temp_dir("DESKIO-elevate")?;
 
     let list = work.join("paths.txt");
     {
@@ -242,7 +242,7 @@ pub fn registry_remove_elevated(keys: &[(String, PathBuf)]) -> Result<(), String
     }
 
     // Run as Administrator — see `proc::private_temp_dir`.
-    let work = crate::proc::private_temp_dir("BHUninstaller-registry")?;
+    let work = crate::proc::private_temp_dir("DESKIO-registry")?;
 
     // key<TAB>backup-file, one per line, UTF-8.
     let list = work.join("keys.txt");

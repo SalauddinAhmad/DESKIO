@@ -128,7 +128,7 @@ pub(crate) fn fetch(url: &str) -> Option<String> {
         // has no releases yet" is an answer, not a failure, and reporting it as
         // one would tell the user something is broken when nothing is.
         .http_status_as_error(false)
-        .user_agent(concat!("BHUninstaller/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("DESKIO/", env!("CARGO_PKG_VERSION")))
         .build()
         .new_agent();
 

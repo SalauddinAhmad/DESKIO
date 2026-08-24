@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate every BHUninstaller icon from the artwork, with real transparency.
+"""Generate every DESKIO icon from the artwork, with real transparency.
 
 Two lessons are baked in here:
 
@@ -155,7 +155,7 @@ def main():
 
     # .icns, on macOS only — iconutil is not available elsewhere.
     if shutil.which("iconutil"):
-        iset = pathlib.Path("/tmp/BHUninstaller.iconset")
+        iset = pathlib.Path("/tmp/DESKIO.iconset")
         if iset.exists():
             shutil.rmtree(iset)
         iset.mkdir()

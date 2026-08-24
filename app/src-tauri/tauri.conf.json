@@ -56,7 +56,7 @@
       }
     },
     "publisher": "Deskio Team",
-    "homepage": "https://github.com/wpexpertinbd/BHUninstaller",
+    "homepage": "https://github.com/deskio/deskio",
     "longDescription": "Deskio — Organize. Clean. Simplify. Uninstall applications thoroughly, sweep developer build junk (node_modules, Cargo targets, Xcode caches), and reclaim your disk space with total safety."
   }
 }
