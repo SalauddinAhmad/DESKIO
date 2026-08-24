@@ -64,3 +64,13 @@ pub fn children(dir: &Path) -> Vec<std::path::PathBuf> {
 pub fn is_unreadable_dir(dir: &Path) -> bool {
     dir.is_dir() && fs::read_dir(dir).is_err()
 }
+
+/// True when this path is a symlink.
+///
+/// Used to stop a directory walk following a link out of the tree it is
+/// supposed to be scanning — `/Applications` can contain links to anywhere.
+pub fn is_symlink(path: &Path) -> bool {
+    fs::symlink_metadata(path)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
+}

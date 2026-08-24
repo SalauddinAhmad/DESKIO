@@ -26,15 +26,49 @@ fn scan_roots() -> Vec<(PathBuf, AppSource)> {
     roots
 }
 
+/// How far below a scan root an application may sit.
+///
+/// ⚠️ Scanning only the top level of `/Applications` misses a great many real
+/// applications, because plenty of installers make a folder of their own:
+/// `/Applications/Adobe Photoshop 2026/Adobe Photoshop 2026.app`, browser web
+/// apps under `~/Applications/Chrome Apps.localized/`, and so on.
+///
+/// That is not merely a missing row. Leftover detection asks which
+/// applications are installed, so an application it cannot see has all of its
+/// preferences and caches classified as belonging to something already
+/// deleted — and the Remaining Files screen then offers to remove the working
+/// data of an application the user is still using. On the machine this was
+/// found on, that was 345 MB of a perfectly healthy Photoshop.
+///
+/// Two levels covers every case seen so far without turning the scan into a
+/// walk of the whole disk.
+const MAX_APP_DEPTH: usize = 2;
+
 pub fn installed_apps(opts: ScanOptions) -> Vec<InstalledApp> {
     let mut apps: Vec<InstalledApp> = Vec::new();
     let mut seen: Vec<PathBuf> = Vec::new();
 
     for (root, source) in scan_roots() {
-        for path in fsutil::children(&root) {
-            if path.extension().and_then(|e| e.to_str()) != Some("app") {
-                continue;
-            }
+        collect(&root, source, 0, opts, &mut seen, &mut apps);
+    }
+    apps
+}
+
+/// Read every `.app` at or below `dir`, to a bounded depth.
+///
+/// An `.app` is itself a directory, so it is read as a bundle and never
+/// descended into — otherwise every helper and XPC service inside one would be
+/// listed as a separate application.
+fn collect(
+    dir: &Path,
+    source: AppSource,
+    depth: usize,
+    opts: ScanOptions,
+    seen: &mut Vec<PathBuf>,
+    apps: &mut Vec<InstalledApp>,
+) {
+    for path in fsutil::children(dir) {
+        if path.extension().and_then(|e| e.to_str()) == Some("app") {
             if seen.contains(&path) {
                 continue;
             }
@@ -45,9 +79,14 @@ pub fn installed_apps(opts: ScanOptions) -> Vec<InstalledApp> {
                 }
                 apps.push(app);
             }
+            continue;
+        }
+        // A plain folder. Vendors use these to group an application with its
+        // uninstaller and extras, so the application is one level in.
+        if depth < MAX_APP_DEPTH && path.is_dir() && !fsutil::is_symlink(&path) {
+            collect(&path, source, depth + 1, opts, seen, apps);
         }
     }
-    apps
 }
 
 /// Read an `.app` bundle's `Info.plist` into an `InstalledApp`.
@@ -280,4 +319,48 @@ fn find_icns(bundle: &Path) -> Option<PathBuf> {
     fsutil::children(&resources)
         .into_iter()
         .find(|p| p.extension().and_then(|e| e.to_str()) == Some("icns"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An installer that makes a folder of its own must not hide the app.
+    ///
+    /// This is not cosmetic: an application the scan cannot see is treated as
+    /// deleted, and everything it stores in ~/Library is then offered for
+    /// removal as a leftover. Scanning only the top level of /Applications hid
+    /// four installed Adobe applications on the machine this was found on, and
+    /// put 747 MB of their working data on the Remaining Files screen.
+    #[test]
+    fn an_app_inside_a_vendor_folder_is_still_found() {
+        let root = std::env::temp_dir().join(format!("bhu-scan-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("Top.app/Contents")).unwrap();
+        std::fs::create_dir_all(root.join("Vendor Suite/Nested.app/Contents")).unwrap();
+        std::fs::create_dir_all(root.join("Vendor Suite/Extras/Deep.app/Contents")).unwrap();
+        // Inside a bundle. Helpers are not applications and must never be
+        // listed as if they were.
+        std::fs::create_dir_all(root.join("Top.app/Contents/Library/Helper.app")).unwrap();
+
+        let mut seen = Vec::new();
+        let mut apps = Vec::new();
+        collect(
+            &root,
+            AppSource::Applications,
+            0,
+            ScanOptions {
+                compute_sizes: false,
+                include_system: false,
+            },
+            &mut seen,
+            &mut apps,
+        );
+
+        let mut names: Vec<String> = apps.into_iter().map(|a| a.name).collect();
+        names.sort();
+        assert_eq!(names, vec!["Deep", "Nested", "Top"]);
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }
