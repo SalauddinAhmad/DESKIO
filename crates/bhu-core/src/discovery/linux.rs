@@ -464,13 +464,64 @@ fn cached_launchers() -> &'static std::collections::HashMap<String, Launcher> {
 
 /// The command that removes this package. Shown to the user; never run without
 /// them seeing it, since it needs root and is the package manager's business.
+/// How to become root for a package removal.
+///
+/// `sudo` is wrong here. This is a windowed application: it has no terminal to
+/// ask in, so `sudo` fails with "no tty present" and the removal reports that
+/// nothing happened — which is exactly what a user saw trying to remove
+/// Sublime Text.
+///
+/// `pkexec` is the answer, and specifically it is the answer for the same
+/// reason macOS uses `osascript ... with administrator privileges`: **the
+/// system asks for the password, not us.** This app never sees, holds or
+/// passes on the user's password, and there is no version of this where it
+/// should — a tool that deletes files asking for your root password in its own
+/// text field is indistinguishable from one you should not run.
+///
+/// `sudo` remains the fallback for a machine without polkit, where the app was
+/// most likely started from a terminal that can prompt anyway.
+fn elevate_with() -> &'static str {
+    if Path::new("/usr/bin/pkexec").exists() {
+        "pkexec"
+    } else {
+        "sudo"
+    }
+}
+
+/// True when a package name is safe to put in a command line.
+///
+/// The command is run through a shell, so this is the boundary. Debian names
+/// allow letters, digits, `+`, `-` and `.`; flatpak ids add nothing beyond
+/// that; snap names are stricter still. Anything else is refused rather than
+/// escaped — there is no legitimate package with a space or a semicolon in its
+/// name, so a name that has one is not a package.
+fn is_safe_package_name(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 200
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.' | '_' | ':' | '/'))
+        && !id.starts_with('-')
+}
+
 pub fn uninstall_command(app: &InstalledApp) -> Option<String> {
+    if !is_safe_package_name(&app.id) {
+        return None;
+    }
+    let sudo = elevate_with();
     Some(match app.source {
-        AppSource::Dpkg => format!("sudo apt-get remove --purge {}", app.id),
-        AppSource::Rpm => format!("sudo dnf remove {}", app.id),
-        AppSource::Pacman => format!("sudo pacman -Rns {}", app.id),
-        AppSource::Flatpak => format!("flatpak uninstall {}", app.id),
-        AppSource::Snap => format!("sudo snap remove {}", app.id),
+        // ⚠️ The confirmation flags are not optional. Without them apt and dnf
+        // stop to ask "do you want to continue?" of a terminal that does not
+        // exist, and the removal hangs or fails having done nothing. The user
+        // has already confirmed, in a sheet that showed them this exact
+        // command.
+        AppSource::Dpkg => format!("{sudo} apt-get remove --purge -y {}", app.id),
+        AppSource::Rpm => format!("{sudo} dnf remove -y {}", app.id),
+        AppSource::Pacman => format!("{sudo} pacman -Rns --noconfirm {}", app.id),
+        // flatpak asks polkit itself when it needs to, and a per-user install
+        // needs nothing at all.
+        AppSource::Flatpak => format!("flatpak uninstall -y {}", app.id),
+        AppSource::Snap => format!("{sudo} snap remove {}", app.id),
         _ => return None,
     })
 }
@@ -605,6 +656,33 @@ gimp: /usr/share/applications/gimp.desktop
             Some(&"firefox".to_string())
         );
         assert_eq!(owners.len(), 3, "the notice line must not become an entry");
+    }
+
+    #[test]
+    fn a_package_name_that_is_not_one_is_refused() {
+        // The command reaches a shell, so this is the boundary.
+        for id in [
+            "",
+            "firefox; rm -rf ~",
+            "foo bar",
+            "$(id)",
+            "`id`",
+            "foo|bar",
+            "--force-yes",
+            "foo\nbar",
+        ] {
+            assert!(!is_safe_package_name(id), "should have refused {id:?}");
+        }
+        for id in [
+            "google-chrome-stable",
+            "sublime-text",
+            "org.gimp.GIMP",
+            "libc6",
+            "gcc-13",
+            "python3.12",
+        ] {
+            assert!(is_safe_package_name(id), "should have allowed {id:?}");
+        }
     }
 
     #[test]
