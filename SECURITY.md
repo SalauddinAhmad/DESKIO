@@ -7,7 +7,7 @@ reports are welcome and taken seriously.
 
 Please report privately rather than opening a public issue:
 
-- GitHub's [private vulnerability reporting](https://github.com/deskio/deskio/security/advisories/new)
+- GitHub's [private vulnerability reporting](https://github.com/SalauddinAhmad/DESKIO/security/advisories/new)
 - or email **benjamin dot biswas at gmail dot com**
 
 Please include what you did, what happened, and which version and platform.

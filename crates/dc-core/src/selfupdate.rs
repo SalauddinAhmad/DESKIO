@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const REPO: &str = "deskio/deskio";
+const REPO: &str = "SalauddinAhmad/DESKIO";
 const ALLOWED_HOSTS: &[&str] = &["github.com", "objects.githubusercontent.com"];
 
 /// How long to leave between automatic checks.

@@ -6,7 +6,7 @@ is still outstanding.
 ## Getting set up
 
 ```bash
-git clone https://github.com/deskio/deskio.git
+git clone https://github.com/SalauddinAhmad/DESKIO.git
 cd deskio
 
 cargo build --release        # engine + CLI
