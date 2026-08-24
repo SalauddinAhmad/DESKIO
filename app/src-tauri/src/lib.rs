@@ -560,12 +560,23 @@ fn fit_to_work_area(window: &tauri::WebviewWindow) {
     let deco_w = outer.width.saturating_sub(inner.width) as f64 / scale;
     let deco_h = outer.height.saturating_sub(inner.height) as f64 / scale;
 
-    // A margin so the window never sits flush against an edge.
+    // A margin so the window never sits flush against an edge, and a ceiling
+    // as a share of the screen.
+    //
+    // The fixed default is chosen for a laptop display. On a smaller screen —
+    // or one reporting a fractional scale, which a Linux VM on a Mac typically
+    // does — the same figure is most of the width, and the app opens looking
+    // like it is trying to be full screen. Capping it at a share of the work
+    // area keeps it a window on those, and changes nothing on a display with
+    // room for the default.
     const MARGIN: f64 = 24.0;
+    const MAX_SHARE: f64 = 0.85;
     let want_w = inner.width as f64 / scale;
     let want_h = inner.height as f64 / scale;
-    let w = want_w.min((area_w - MARGIN - deco_w).max(320.0));
-    let h = want_h.min((area_h - MARGIN - deco_h).max(320.0));
+    let room_w = (area_w - MARGIN - deco_w).min(area_w * MAX_SHARE);
+    let room_h = (area_h - MARGIN - deco_h).min(area_h * MAX_SHARE);
+    let w = want_w.min(room_w.max(320.0));
+    let h = want_h.min(room_h.max(320.0));
 
     if w < want_w || h < want_h {
         let _ = window.set_size(tauri::LogicalSize::new(w, h));

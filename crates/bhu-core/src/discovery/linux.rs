@@ -26,13 +26,20 @@ pub fn installed_apps(opts: ScanOptions) -> Vec<InstalledApp> {
     apps.extend(snap());
     apps.extend(appimages(opts));
 
-    // A package name is not what a person recognises, so where a .desktop entry
-    // exists its Name is preferred.
-    let names = desktop_names();
+    // A package name is not what a person recognises, so where a launcher
+    // exists its Name is preferred — and a package with no launcher at all is
+    // not an application, it is part of the system.
+    let launchers = launchers_by_package();
     for app in apps.iter_mut() {
-        if let Some(pretty) = names.get(&app.id) {
-            app.name = pretty.clone();
+        match launchers.get(&app.id) {
+            Some(launcher) => app.name = launcher.name.clone(),
+            // Flatpaks, snaps and AppImages are applications by definition;
+            // only a package-manager entry has to earn its place in the list.
+            None => app.is_system = matches!(app.source, AppSource::Dpkg | AppSource::Rpm),
         }
+    }
+    if !opts.include_system {
+        apps.retain(|a| !a.is_system);
     }
     apps
 }
@@ -220,16 +227,39 @@ fn appimages(opts: ScanOptions) -> Vec<InstalledApp> {
 }
 
 /// Package name -> the name a person would recognise, from `.desktop` entries.
-fn desktop_names() -> std::collections::HashMap<String, String> {
-    let mut map = std::collections::HashMap::new();
+/// One `.desktop` launcher.
+struct Launcher {
+    name: String,
+    icon: Option<String>,
+}
+
+/// Every application launcher on the system, keyed by the **package that owns
+/// it** rather than by its filename.
+///
+/// The filename is not the package name and assuming it is loses real
+/// applications: Google Chrome installs as `google-chrome-stable` and ships
+/// `google-chrome.desktop`, so a filename match finds nothing and Chrome never
+/// appears at all. `dpkg -S` answers the question properly, in one call for
+/// every launcher at once.
+///
+/// This map is also what separates an application from a package. A Linux
+/// system has upwards of 1700 packages installed and almost none of them are
+/// things a person would say they have "installed" — `acl`, `adduser`,
+/// `libc6`. A package that ships no launcher is marked as a system package and
+/// hidden, exactly as the macOS and Windows adapters already do.
+fn launchers_by_package() -> std::collections::HashMap<String, Launcher> {
     let mut dirs: Vec<PathBuf> = vec![
         PathBuf::from("/usr/share/applications"),
+        PathBuf::from("/usr/local/share/applications"),
         PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+        PathBuf::from("/var/lib/snapd/desktop/applications"),
     ];
     if let Some(home) = dirs::home_dir() {
         dirs.push(home.join(".local/share/applications"));
     }
 
+    // Read every launcher first, keyed by its path.
+    let mut found: Vec<(PathBuf, String, Launcher)> = Vec::new();
     for dir in dirs {
         for path in fsutil::children(&dir) {
             if path.extension().and_then(|e| e.to_str()) != Some("desktop") {
@@ -241,16 +271,78 @@ fn desktop_names() -> std::collections::HashMap<String, String> {
             let Ok(text) = std::fs::read_to_string(&path) else {
                 continue;
             };
-            if let Some(name) = text
-                .lines()
-                .find_map(|l| l.strip_prefix("Name="))
-                .map(str::to_string)
-            {
-                map.insert(stem, name);
+            let field = |key: &str| {
+                text.lines()
+                    .find_map(|l| l.strip_prefix(key))
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            };
+            // `NoDisplay=true` is how a launcher says it is plumbing rather
+            // than an application — file-type handlers, settings panels, and
+            // the like. The desktop hides them and so do we.
+            if field("NoDisplay=").is_some_and(|v| v.eq_ignore_ascii_case("true")) {
+                continue;
+            }
+            let Some(name) = field("Name=") else { continue };
+            found.push((
+                path,
+                stem,
+                Launcher {
+                    name,
+                    icon: field("Icon="),
+                },
+            ));
+        }
+    }
+
+    // Ask dpkg who owns them, all in one call.
+    let paths: Vec<String> = found
+        .iter()
+        .map(|(p, _, _)| p.to_string_lossy().to_string())
+        .collect();
+    let mut owner: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    if !paths.is_empty() {
+        let args: Vec<&str> = std::iter::once("-S")
+            .chain(paths.iter().map(String::as_str))
+            .collect();
+        if let Some(text) = output("dpkg-query", &args) {
+            for line in text.lines() {
+                // "pkg: /path", or "pkg1, pkg2: /path" when several ship it.
+                let Some((pkgs, path)) = line.rsplit_once(": ") else {
+                    continue;
+                };
+                if let Some(first) = pkgs.split(',').next() {
+                    owner.insert(path.trim().to_string(), first.trim().to_string());
+                }
             }
         }
     }
+
+    let mut map = std::collections::HashMap::new();
+    for (path, stem, launcher) in found {
+        // The owning package where dpkg could tell us, and the filename
+        // otherwise — which is right for flatpak, snap and rpm systems, where
+        // the id already is the launcher's name.
+        let key = owner
+            .get(&path.to_string_lossy().to_string())
+            .cloned()
+            .unwrap_or(stem);
+        map.entry(key).or_insert(launcher);
+    }
     map
+}
+
+/// The same map, built once per run.
+///
+/// Icons are fetched one application at a time and in parallel, so calling the
+/// builder per row would mean a `dpkg -S` for every row and would dominate the
+/// scan. The list itself reads fresh in `installed_apps`, so a refresh still
+/// reflects what is installed now; a stale icon for something already removed
+/// costs nothing, because it is no longer in the list to draw.
+fn cached_launchers() -> &'static std::collections::HashMap<String, Launcher> {
+    static CACHE: std::sync::OnceLock<std::collections::HashMap<String, Launcher>> =
+        std::sync::OnceLock::new();
+    CACHE.get_or_init(launchers_by_package)
 }
 
 /// The command that removes this package. Shown to the user; never run without
@@ -275,7 +367,12 @@ pub fn enrich(_app: &mut InstalledApp) {}
 /// as they are. SVG-only icons are skipped — rasterising them would mean
 /// pulling in a renderer for a 38-pixel row.
 pub fn icon(app: &InstalledApp) -> Option<String> {
-    let name = desktop_icon_name(&app.id)?;
+    // The owning package again, for the same reason as the name: Chrome's
+    // launcher is not called after its package.
+    let name = cached_launchers()
+        .get(&app.id)
+        .and_then(|l| l.icon.clone())
+        .or_else(|| desktop_icon_name(&app.id))?;
 
     // An absolute path in Icon= is used directly.
     let direct = PathBuf::from(&name);
