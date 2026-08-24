@@ -539,7 +539,24 @@ fn engine_version() -> String {
 /// So the size is clamped to the work area rather than the monitor, decorations
 /// included, and the window is centred within that area instead.
 fn fit_to_work_area(window: &tauri::WebviewWindow) {
-    let Ok(Some(monitor)) = window.current_monitor() else {
+    // ⚠️ `current_monitor` answers by asking which monitor the window is on —
+    // and this runs before the window has been shown, so on Wayland there is
+    // no answer yet and it returns `None`. Returning early there meant the
+    // whole fit silently did nothing on Linux, which is why an earlier attempt
+    // to cap the size changed nothing at all. Fall back to the primary
+    // monitor, then to whatever monitor exists.
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten())
+        .or_else(|| {
+            window
+                .available_monitors()
+                .ok()
+                .and_then(|m| m.into_iter().next())
+        });
+    let Some(monitor) = monitor else {
         return;
     };
     let scale = monitor.scale_factor();
@@ -563,18 +580,22 @@ fn fit_to_work_area(window: &tauri::WebviewWindow) {
     // A margin so the window never sits flush against an edge, and a ceiling
     // as a share of the screen.
     //
-    // The fixed default is chosen for a laptop display. On a smaller screen —
-    // or one reporting a fractional scale, which a Linux VM on a Mac typically
-    // does — the same figure is most of the width, and the app opens looking
-    // like it is trying to be full screen. Capping it at a share of the work
-    // area keeps it a window on those, and changes nothing on a display with
-    // room for the default.
+    // The configured default is chosen for a laptop display. On a smaller
+    // desktop — or one reporting a fractional scale, which a Linux VM on a Mac
+    // does — that same figure covers nearly the whole screen, and the app opens
+    // looking as though it wanted to be full screen. It should open as a
+    // window; making it larger is the user's decision, and the maximise button
+    // is right there.
+    //
+    // Height gets the more generous share because the list is what people
+    // scroll, and a short window is more annoying than a narrow one.
     const MARGIN: f64 = 24.0;
-    const MAX_SHARE: f64 = 0.85;
+    const MAX_WIDTH_SHARE: f64 = 0.72;
+    const MAX_HEIGHT_SHARE: f64 = 0.80;
     let want_w = inner.width as f64 / scale;
     let want_h = inner.height as f64 / scale;
-    let room_w = (area_w - MARGIN - deco_w).min(area_w * MAX_SHARE);
-    let room_h = (area_h - MARGIN - deco_h).min(area_h * MAX_SHARE);
+    let room_w = (area_w - MARGIN - deco_w).min(area_w * MAX_WIDTH_SHARE);
+    let room_h = (area_h - MARGIN - deco_h).min(area_h * MAX_HEIGHT_SHARE);
     let w = want_w.min(room_w.max(320.0));
     let h = want_h.min(room_h.max(320.0));
 
