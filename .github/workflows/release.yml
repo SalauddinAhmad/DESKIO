@@ -5,6 +5,7 @@ name: Release
 # each platform and a vX.Y.Z tag — the updater matches on both.
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -117,7 +118,7 @@ jobs:
 
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --draft \
-              --title "BHUninstaller $TAG" \
+              --title "DESKIO $TAG" \
               --notes "See the README for what is in this release. macOS builds are ad-hoc signed, not notarised: open with right-click → Open the first time." \
               || true
           fi

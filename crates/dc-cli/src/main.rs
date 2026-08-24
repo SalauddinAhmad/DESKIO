@@ -5,9 +5,9 @@
 //! in a terminal is far quicker than clicking through a UI. It is also the only
 //! way to exercise the engine on a server or in CI.
 
-use bhu_core::discovery::ScanOptions;
-use bhu_core::model::*;
-use bhu_core::{discovery, removal};
+use dc_core::discovery::ScanOptions;
+use dc_core::model::*;
+use dc_core::{discovery, removal};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -43,18 +43,18 @@ fn main() {
 
 fn usage() {
     eprintln!(
-        "bhu — BHUninstaller engine
+        "deskio — Deskio engine
 
-  bhu list                 list installed applications
-  bhu info <app>           detailed information about one app
-  bhu plan <app>           show what uninstalling it would remove (dry run)
-  bhu orphans              leftovers of apps that are no longer installed
-  bhu history              past removals
-  bhu restore <id>         put a past removal back where it came from
-  bhu startup              things that run when you log in
-  bhu startup on|off <id>  turn one of them on or off
-  bhu extensions           browser extensions, plugins, panes, installers
-  bhu remove <app> --yes   execute the plan (moves everything to the Trash)
+  deskio list                 list installed applications
+  deskio info <app>           detailed information about one app
+  deskio plan <app>           show what uninstalling it would remove (dry run)
+  deskio orphans              leftovers of apps that are no longer installed
+  deskio history              past removals
+  deskio restore <id>         put a past removal back where it came from
+  deskio startup              things that run when you log in
+  deskio startup on|off <id>  turn one of them on or off
+  deskio extensions           browser extensions, plugins, panes, installers
+  deskio remove <app> --yes   execute the plan (moves everything to the Trash)
 
   --json                   machine-readable output
   --sound                  play the Finder trash sound while removing
@@ -168,7 +168,7 @@ fn cmd_plan(query: Option<&str>, json: bool) {
     };
     let mut app = app.clone();
     discovery::enrich(&mut app);
-    let plan = bhu_core::plan_uninstall(&app, &apps);
+    let plan = dc_core::plan_uninstall(&app, &apps);
 
     if json {
         println!("{}", serde_json::to_string_pretty(&plan).unwrap());
@@ -216,7 +216,7 @@ fn print_plan(plan: &RemovalPlan) {
 }
 
 fn cmd_orphans(json: bool) {
-    let groups = bhu_core::scan_orphans();
+    let groups = dc_core::scan_orphans();
     if json {
         println!("{}", serde_json::to_string_pretty(&groups).unwrap());
         return;
@@ -241,7 +241,7 @@ fn cmd_orphans(json: bool) {
 }
 
 fn cmd_history(json: bool) {
-    let entries = bhu_core::undo::history();
+    let entries = dc_core::undo::history();
     if json {
         println!("{}", serde_json::to_string_pretty(&entries).unwrap());
         return;
@@ -265,7 +265,7 @@ fn cmd_history(json: bool) {
 }
 
 fn cmd_startup(action: Option<&str>, id: Option<&str>, json: bool) {
-    use bhu_core::startup;
+    use dc_core::startup;
     let items = startup::list();
 
     match action {
@@ -321,7 +321,7 @@ fn cmd_startup(action: Option<&str>, id: Option<&str>, json: bool) {
 }
 
 fn cmd_access(json: bool) {
-    let r = bhu_core::access::report();
+    let r = dc_core::access::report();
     if json {
         println!("{}", serde_json::to_string_pretty(&r).unwrap());
         return;
@@ -339,7 +339,7 @@ fn cmd_access(json: bool) {
 }
 
 fn cmd_cleanup(json: bool) {
-    let groups = bhu_core::cleaner::scan();
+    let groups = dc_core::cleaner::scan();
     if json {
         println!("{}", serde_json::to_string_pretty(&groups).unwrap());
         return;
@@ -376,7 +376,7 @@ fn cmd_updates(json: bool) {
         compute_sizes: false,
         include_system: false,
     });
-    let found = bhu_core::updates::check(&apps);
+    let found = dc_core::updates::check(&apps);
     if json {
         println!("{}", serde_json::to_string_pretty(&found).unwrap());
         return;
@@ -401,7 +401,7 @@ fn cmd_updates(json: bool) {
 }
 
 fn cmd_extensions(json: bool) {
-    let groups = bhu_core::extensions::list();
+    let groups = dc_core::extensions::list();
     if json {
         println!("{}", serde_json::to_string_pretty(&groups).unwrap());
         return;
@@ -431,7 +431,7 @@ fn cmd_restore(id: Option<&str>) {
         usage();
         std::process::exit(2)
     };
-    let outcomes = bhu_core::undo::restore(id);
+    let outcomes = dc_core::undo::restore(id);
     if outcomes.is_empty() {
         eprintln!("no removal with id \"{id}\" — run `bhu history` to see them");
         std::process::exit(1);
@@ -458,7 +458,7 @@ fn cmd_remove(query: Option<&str>, args: &[String]) {
     };
     let mut app = app.clone();
     discovery::enrich(&mut app);
-    let plan = bhu_core::plan_uninstall(&app, &apps);
+    let plan = dc_core::plan_uninstall(&app, &apps);
     print_plan(&plan);
 
     if !args.iter().any(|a| a == "--yes") {
@@ -471,7 +471,7 @@ fn cmd_remove(query: Option<&str>, args: &[String]) {
     }
 
     let opts = RemovalOptions {
-        sound: args.iter().any(|a| a == "--sound") || bhu_core::settings::load().removal_sound,
+        sound: args.iter().any(|a| a == "--sound") || dc_core::settings::load().removal_sound,
         force: args.iter().any(|a| a == "--force"),
     };
     let report = removal::execute(&plan, opts);

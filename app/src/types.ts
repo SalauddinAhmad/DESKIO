@@ -235,5 +235,5 @@ export interface Settings {
 }
 
 export type Section =
-  | "applications" | "startup" | "extensions" | "remaining"
-  | "updates" | "cleanup" | "history";
+  | "dashboard" | "applications" | "remaining" | "dev_clean" | "cleanup"
+  | "startup" | "extensions" | "updates" | "history";

@@ -1,6 +1,6 @@
 [package]
-name = "bhu-core"
-description = "BHUninstaller engine: app discovery, leftover scanning, and safe removal."
+name = "dc-core"
+description = "Deskio engine: app discovery, leftover scanning, and safe removal."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

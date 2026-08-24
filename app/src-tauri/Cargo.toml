@@ -1,6 +1,6 @@
 [package]
-name = "bhuninstaller"
-description = "BHUninstaller — uninstall applications and clean up what they leave behind."
+name = "deskio"
+description = "Deskio — Organize. Clean. Simplify."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,14 +8,14 @@ authors.workspace = true
 repository.workspace = true
 
 [lib]
-name = "bhuninstaller_lib"
+name = "deskio_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-bhu-core = { path = "../../crates/bhu-core" }
+dc-core = { path = "../../crates/dc-core" }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde.workspace = true

@@ -5,17 +5,17 @@
 //! engine, so that the Windows and Linux builds get identical behaviour from
 //! the same code.
 
-use bhu_core::access::AccessReport;
-use bhu_core::cleaner::JunkGroup;
-use bhu_core::extensions::ExtensionGroup;
-use bhu_core::leftovers::OrphanGroup;
-use bhu_core::model::*;
-use bhu_core::selfupdate::{CheckResult, Release};
-use bhu_core::settings::Settings;
-use bhu_core::startup::StartupItem;
-use bhu_core::undo::{RestoreOutcome, UndoEntry};
-use bhu_core::updates::UpdateInfo;
-use bhu_core::{discovery, removal};
+use dc_core::access::AccessReport;
+use dc_core::cleaner::JunkGroup;
+use dc_core::extensions::ExtensionGroup;
+use dc_core::leftovers::OrphanGroup;
+use dc_core::model::*;
+use dc_core::selfupdate::{CheckResult, Release};
+use dc_core::settings::Settings;
+use dc_core::startup::StartupItem;
+use dc_core::undo::{RestoreOutcome, UndoEntry};
+use dc_core::updates::UpdateInfo;
+use dc_core::{discovery, removal};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -143,7 +143,7 @@ fn plan_uninstall(id: String, cache: State<Cache>) -> Option<RemovalPlan> {
     // that is what attaches the platform's uninstall command. Building it
     // by hand meant Windows never ran the vendor's uninstaller and tried to
     // delete Program Files itself instead.
-    let plan = bhu_core::plan_uninstall(&app, &apps);
+    let plan = dc_core::plan_uninstall(&app, &apps);
     cache.offer(&plan);
     Some(plan)
 }
@@ -152,7 +152,7 @@ fn plan_uninstall(id: String, cache: State<Cache>) -> Option<RemovalPlan> {
 fn orphan_groups(refresh: bool, cache: State<Cache>) -> Vec<OrphanGroup> {
     let mut groups = cache.orphans.lock().unwrap();
     if groups.is_empty() || refresh {
-        *groups = bhu_core::scan_orphans();
+        *groups = dc_core::scan_orphans();
     }
     groups.clone()
 }
@@ -209,7 +209,7 @@ fn execute_plan(plan: RemovalPlan, force: bool, cache: State<Cache>) -> RemovalR
     });
 
     let opts = RemovalOptions {
-        sound: bhu_core::settings::load().removal_sound,
+        sound: dc_core::settings::load().removal_sound,
         force,
     };
     let mut report = removal::execute(&plan, opts);
@@ -229,7 +229,7 @@ fn execute_plan(plan: RemovalPlan, force: bool, cache: State<Cache>) -> RemovalR
 fn startup_items(refresh: bool, cache: State<Cache>) -> Vec<StartupItem> {
     let mut items = cache.startup.lock().unwrap();
     if items.is_empty() || refresh {
-        *items = bhu_core::startup::list();
+        *items = dc_core::startup::list();
     }
     items.clone()
 }
@@ -245,7 +245,7 @@ fn set_startup_enabled(id: String, enabled: bool, cache: State<Cache>) -> Result
         .find(|i| i.id == id)
         .cloned()
         .ok_or("that startup item is no longer there")?;
-    bhu_core::startup::set_enabled(&item, enabled)?;
+    dc_core::startup::set_enabled(&item, enabled)?;
     // Re-read rather than assuming the change took: launchd is the source of
     // truth for this, not us.
     cache.startup.lock().unwrap().clear();
@@ -256,7 +256,7 @@ fn set_startup_enabled(id: String, enabled: bool, cache: State<Cache>) -> Result
 fn extension_groups(refresh: bool, cache: State<Cache>) -> Vec<ExtensionGroup> {
     let mut groups = cache.extensions.lock().unwrap();
     if groups.is_empty() || refresh {
-        *groups = bhu_core::extensions::list();
+        *groups = dc_core::extensions::list();
     }
     groups.clone()
 }
@@ -287,7 +287,7 @@ fn plan_extensions(ids: Vec<String>, cache: State<Cache>) -> RemovalPlan {
 fn junk_groups(refresh: bool, cache: State<Cache>) -> Vec<JunkGroup> {
     let mut groups = cache.junk.lock().unwrap();
     if groups.is_empty() || refresh {
-        *groups = bhu_core::cleaner::scan();
+        *groups = dc_core::cleaner::scan();
     }
     groups.clone()
 }
@@ -314,7 +314,7 @@ fn plan_cleanup(ids: Vec<String>, cache: State<Cache>) -> RemovalPlan {
 }
 
 /// Look up newer versions. The only command in the app that touches the
-/// network, and only ever to public endpoints — see `bhu_core::updates`.
+/// network, and only ever to public endpoints — see `dc_core::updates`.
 #[tauri::command]
 fn check_updates(refresh: bool, cache: State<Cache>) -> Vec<UpdateInfo> {
     {
@@ -330,20 +330,20 @@ fn check_updates(refresh: bool, cache: State<Cache>) -> Vec<UpdateInfo> {
         }
         guard.clone()
     };
-    let found = bhu_core::updates::check(&apps);
+    let found = dc_core::updates::check(&apps);
     *cache.updates.lock().unwrap() = found.clone();
     found
 }
 
 #[tauri::command]
 fn removal_history() -> Vec<UndoEntry> {
-    bhu_core::undo::history()
+    dc_core::undo::history()
 }
 
 /// Put a past removal back where it came from.
 #[tauri::command]
 fn restore_removal(id: String, cache: State<Cache>) -> Vec<RestoreOutcome> {
-    let outcomes = bhu_core::undo::restore(&id);
+    let outcomes = dc_core::undo::restore(&id);
     if outcomes.iter().any(|o| o.restored) {
         cache.apps.lock().unwrap().clear();
         cache.orphans.lock().unwrap().clear();
@@ -353,23 +353,23 @@ fn restore_removal(id: String, cache: State<Cache>) -> Vec<RestoreOutcome> {
 
 #[tauri::command]
 fn get_settings() -> Settings {
-    bhu_core::settings::load()
+    dc_core::settings::load()
 }
 
 #[tauri::command]
 fn set_settings(settings: Settings) -> Result<(), String> {
-    bhu_core::settings::save(&settings)
+    dc_core::settings::save(&settings)
 }
 
 /// Whether the operating system is withholding anything, and what.
 #[tauri::command]
 fn access_report() -> AccessReport {
-    bhu_core::access::report()
+    dc_core::access::report()
 }
 
 #[tauri::command]
 fn full_disk_access() -> bool {
-    bhu_core::access::report().granted
+    dc_core::access::report().granted
 }
 
 /// Open the system settings pane where Full Disk Access is granted.
@@ -385,8 +385,8 @@ fn open_privacy_settings() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let mut last = String::from("no settings pane could be opened");
-        for url in bhu_core::access::SETTINGS_URLS {
-            match bhu_core::proc::command("/usr/bin/open").arg(url).status() {
+        for url in dc_core::access::SETTINGS_URLS {
+            match dc_core::proc::command("/usr/bin/open").arg(url).status() {
                 Ok(status) if status.success() => return Ok(()),
                 Ok(status) => last = format!("open exited with {status}"),
                 Err(e) => last = e.to_string(),
@@ -412,7 +412,7 @@ fn relaunch(app: tauri::AppHandle) {
 /// the file manager. The UI must not offer a button that does nothing.
 #[tauri::command]
 fn can_restore() -> bool {
-    bhu_core::trash_bin::can_restore_programmatically()
+    dc_core::trash_bin::can_restore_programmatically()
 }
 
 /// Look for a newer BHUninstaller.
@@ -421,19 +421,19 @@ fn can_restore() -> bool {
 /// happens when enabled and when a day has passed.
 #[tauri::command]
 fn check_app_update(force: bool) -> CheckResult {
-    let mut settings = bhu_core::settings::load();
+    let mut settings = dc_core::settings::load();
     if !force
         && (!settings.auto_check_updates
-            || !bhu_core::selfupdate::check_due(settings.last_update_check))
+            || !dc_core::selfupdate::check_due(settings.last_update_check))
     {
         return CheckResult {
             update: None,
-            current: bhu_core::VERSION.to_string(),
+            current: dc_core::VERSION.to_string(),
             error: None,
         };
     }
 
-    let result = bhu_core::selfupdate::check();
+    let result = dc_core::selfupdate::check();
     // Only a check that actually completed resets the clock, so a spell offline
     // does not postpone the next attempt by a day.
     if result.error.is_none() {
@@ -441,7 +441,7 @@ fn check_app_update(force: bool) -> CheckResult {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
-        let _ = bhu_core::settings::save(&settings);
+        let _ = dc_core::settings::save(&settings);
     }
     result
 }
@@ -449,7 +449,7 @@ fn check_app_update(force: bool) -> CheckResult {
 /// Download the update and return where it was saved. Nothing is run.
 #[tauri::command]
 fn download_app_update(release: Release) -> Result<String, String> {
-    bhu_core::selfupdate::download(&release).map(|p| p.to_string_lossy().to_string())
+    dc_core::selfupdate::download(&release).map(|p| p.to_string_lossy().to_string())
 }
 
 /// Start the downloaded installer and close BHUninstaller.
@@ -467,7 +467,7 @@ fn install_update(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let path = PathBuf::from(&path);
     // Exactly the file this process downloaded, not merely something in the
     // directory it downloaded into.
-    if bhu_core::selfupdate::last_download().as_deref() != Some(path.as_path()) {
+    if dc_core::selfupdate::last_download().as_deref() != Some(path.as_path()) {
         return Err("that file was not downloaded by this app — refusing to run it".into());
     }
     let ext = path
@@ -502,23 +502,23 @@ fn installer_command(path: &std::path::Path, ext: &str) -> std::process::Command
     {
         // An .msi is data, not a program: it needs msiexec to run it.
         if ext == "msi" {
-            let mut c = bhu_core::proc::command("msiexec");
+            let mut c = dc_core::proc::command("msiexec");
             c.arg("/i").arg(path);
             return c;
         }
-        return bhu_core::proc::command(path);
+        return dc_core::proc::command(path);
     }
     #[cfg(target_os = "macos")]
     {
         let _ = ext;
-        let mut c = bhu_core::proc::command("/usr/bin/open");
+        let mut c = dc_core::proc::command("/usr/bin/open");
         c.arg(path);
         c
     }
     #[cfg(target_os = "linux")]
     {
         let _ = ext;
-        let mut c = bhu_core::proc::command("xdg-open");
+        let mut c = dc_core::proc::command("xdg-open");
         c.arg(path);
         c
     }
@@ -526,7 +526,7 @@ fn installer_command(path: &std::path::Path, ext: &str) -> std::process::Command
 
 #[tauri::command]
 fn engine_version() -> String {
-    bhu_core::VERSION.to_string()
+    dc_core::VERSION.to_string()
 }
 
 /// Keep the window inside the part of the screen that is actually usable.
@@ -658,7 +658,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bhu_core::model::{Confidence, LeftoverKind};
+    use dc_core::model::{Confidence, LeftoverKind};
 
     fn item(path: &str, key: Option<&str>) -> RemovalItem {
         RemovalItem {

@@ -82,7 +82,7 @@ export function SettingsSheet({
             <div>
               <div className="setting-name">Check for updates automatically</div>
               <div className="setting-help">
-                Asks GitHub once a day whether a newer BHUninstaller has been published.
+                Asks GitHub once a day whether a newer DESKIO has been published.
                 Nothing about you is sent, and nothing installs itself.
               </div>
             </div>
@@ -101,7 +101,7 @@ export function SettingsSheet({
             <div>
               <div className="setting-name">This version</div>
               <div className="setting-help">
-                {status ?? `BHUninstaller ${version}`}
+                {status ?? `DESKIO ${version}`}
               </div>
             </div>
             <button className="btn btn-ghost btn-sm" onClick={checkNow} disabled={checking}>
@@ -115,7 +115,7 @@ export function SettingsSheet({
                 <div className="setting-name">Full Disk Access</div>
                 <div className="setting-help">
                   {accessGranted
-                    ? "Granted. BHUninstaller can see everything it needs to."
+                    ? "Granted. DESKIO can see everything it needs to."
                     : "Not granted, so some leftovers are invisible and some sizes read as unknown."}
                 </div>
               </div>
@@ -132,7 +132,7 @@ export function SettingsSheet({
               With it on, items are trashed through Finder, which is what records the
               information behind Finder's "Put Back". With it off they are trashed
               silently and "Put Back" is unavailable — nothing is lost either way,
-              because BHUninstaller records where every item came from and can put a
+              because DESKIO records where every item came from and can put a
               removal back itself from its own history.
             </div>
           </div>

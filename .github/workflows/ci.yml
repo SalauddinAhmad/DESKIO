@@ -27,11 +27,11 @@ jobs:
       # they are actually compiled against their own platform. A type error in
       # one of them fails here rather than on a user's machine.
       - name: Build
-        run: cargo build --workspace --exclude bhuninstaller
+        run: cargo build --workspace --exclude deskio
       - name: Test
-        run: cargo test --workspace --exclude bhuninstaller
+        run: cargo test --workspace --exclude deskio
       - name: Clippy
-        run: cargo clippy --workspace --exclude bhuninstaller -- -D warnings
+        run: cargo clippy --workspace --exclude deskio -- -D warnings
       - name: Formatting
         run: cargo fmt --all -- --check
 

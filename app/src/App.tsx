@@ -16,13 +16,15 @@ import { HistoryView } from "./components/HistoryView";
 import { CleanupView } from "./components/CleanupView";
 import { FullDiskAccessSheet } from "./components/FullDiskAccessSheet";
 import { AppUpdateSheet } from "./components/AppUpdateSheet";
+import { DashboardView } from "./components/DashboardView";
+import { DevCleanView } from "./components/DevCleanView";
 import {
-  IconApps, IconBroom, IconHistory, IconPuzzle, IconRemaining, IconSettings,
-  IconStartup, IconUpdates, IconWarn,
+  IconApps, IconBroom, IconDashboard, IconHistory, IconPuzzle, IconRemaining,
+  IconSettings, IconStartup, IconTerminal, IconUpdates, IconWarn,
 } from "./components/icons";
 
 export default function App() {
-  const [section, setSection] = useState<Section>("applications");
+  const [section, setSection] = useState<Section>("dashboard");
   const [apps, setApps] = useState<InstalledApp[]>([]);
   const [icons, setIcons] = useState<Record<string, string>>({});
   const [orphans, setOrphans] = useState<OrphanGroup[]>([]);
@@ -334,10 +336,34 @@ export default function App() {
     <div className="shell">
       <nav className="rail" data-tauri-drag-region>
         <RailItem
+          label="Overview"
+          active={section === "dashboard"}
+          onClick={() => setSection("dashboard")}
+          icon={<IconDashboard />}
+        />
+        <RailItem
           label="Applications"
           active={section === "applications"}
           onClick={() => setSection("applications")}
           icon={<IconApps />}
+        />
+        <RailItem
+          label={"Remaining\nFiles"}
+          active={section === "remaining"}
+          onClick={() => setSection("remaining")}
+          icon={<IconRemaining />}
+        />
+        <RailItem
+          label={"Dev Clean\nCaches"}
+          active={section === "dev_clean"}
+          onClick={() => setSection("dev_clean")}
+          icon={<IconTerminal />}
+        />
+        <RailItem
+          label="System Junk"
+          active={section === "cleanup"}
+          onClick={() => setSection("cleanup")}
+          icon={<IconBroom />}
         />
         <RailItem
           label={"Startup\nPrograms"}
@@ -350,18 +376,6 @@ export default function App() {
           active={section === "extensions"}
           onClick={() => setSection("extensions")}
           icon={<IconPuzzle />}
-        />
-        <RailItem
-          label={"Remaining\nFiles"}
-          active={section === "remaining"}
-          onClick={() => setSection("remaining")}
-          icon={<IconRemaining />}
-        />
-        <RailItem
-          label="Cleanup"
-          active={section === "cleanup"}
-          onClick={() => setSection("cleanup")}
-          icon={<IconBroom />}
         />
         <RailItem
           label="Updates"
@@ -384,11 +398,25 @@ export default function App() {
           />
         </div>
         <div className="rail-brand" style={{ marginTop: 10 }}>
-          BiswasHost
+          DESKIO
           <span>v{version}</span>
         </div>
       </nav>
 
+      {section === "dashboard" && (
+        <DashboardView
+          apps={apps}
+          orphans={orphans}
+          junk={junk}
+          fdaGranted={access.granted}
+          onNavigate={(s) => setSection(s)}
+          onRefreshAll={() => {
+            api.listApps(true).then(setApps);
+            api.orphanGroups(true).then(setOrphans);
+            api.junkGroups(true).then(setJunk);
+          }}
+        />
+      )}
       {section === "applications" && (
         <AppsView
           apps={apps}
@@ -397,6 +425,12 @@ export default function App() {
           loading={loading}
           removalNonce={removalNonce}
           onUninstall={openPlanFor}
+        />
+      )}
+      {section === "dev_clean" && (
+        <DevCleanView
+          junk={junk}
+          onCleanDevJunk={openCleanupPlan}
         />
       )}
       {section === "startup" && (

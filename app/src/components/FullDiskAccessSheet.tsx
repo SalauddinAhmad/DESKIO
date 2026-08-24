@@ -55,7 +55,7 @@ export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
               <IconCheck />
               <div>
                 <strong>That's the permission sorted.</strong>
-                macOS applies it to newly started apps only, so BHUninstaller needs to
+                macOS applies it to newly started apps only, so DESKIO needs to
                 start again before it can actually see anything.
               </div>
             </div>
@@ -82,7 +82,7 @@ export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
           <div className="fda-hero">
             <IconLock />
             <div>
-              <strong>macOS is hiding part of your Library from BHUninstaller.</strong>
+              <strong>macOS is hiding part of your Library from DESKIO.</strong>
               An app cannot ask for this permission — it has to be granted in System
               Settings. Here is exactly what it costs to leave it off.
             </div>
@@ -119,7 +119,7 @@ export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
           <ol className="fda-steps">
             <li>Open System Settings › Privacy &amp; Security › Full Disk Access.</li>
             <li>
-              Find <b>BHUninstaller</b> in the list, or add it with the <b>+</b> button if
+              Find <b>DESKIO</b> in the list, or add it with the <b>+</b> button if
               it is not there.
             </li>
             <li>Turn its switch on.</li>
@@ -130,7 +130,7 @@ export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
             <IconWarn />
             <div>
               <strong>Already in the list and switched on?</strong>
-              Then remove it with the <b>−</b> button and add it again. BHUninstaller is
+              Then remove it with the <b>−</b> button and add it again. DESKIO is
               not signed with an Apple developer certificate, so macOS identifies it by
               the exact build — and every update is a different build. The old entry stays
               in the list looking correct while no longer applying to the app you are
@@ -152,7 +152,7 @@ export function FullDiskAccessSheet({ report, onRecheck, onClose }: Props) {
           <div className="banner" style={{ margin: "18px 0 0" }}>
             <IconWarn />
             <div>
-              <strong>What BHUninstaller does with it</strong>
+              <strong>What DESKIO does with it</strong>
               Reads those folders to work out what belongs to which app, and nothing else.
               It never sends anything anywhere — the one time it uses the network is the
               Updates screen, which looks up published version numbers and tells them

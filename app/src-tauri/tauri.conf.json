@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "BHUninstaller",
-  "version": "0.2.8",
-  "identifier": "com.biswashost.bhuninstaller",
+  "productName": "Deskio",
+  "version": "1.0.0",
+  "identifier": "com.deskio.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5273",
@@ -12,11 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "BHUninstaller",
-        "width": 1100,
-        "height": 700,
-        "minWidth": 860,
-        "minHeight": 560,
+        "title": "Deskio",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 900,
+        "minHeight": 600,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "visible": false
@@ -42,7 +42,7 @@
       "icons/icon.ico"
     ],
     "category": "Utility",
-    "shortDescription": "Uninstall apps and clean up what they leave behind.",
+    "shortDescription": "Organize. Clean. Simplify.",
     "macOS": {
       "minimumSystemVersion": "11.0"
     },
@@ -55,8 +55,8 @@
         ]
       }
     },
-    "publisher": "BiswasHost",
+    "publisher": "Deskio Team",
     "homepage": "https://github.com/wpexpertinbd/BHUninstaller",
-    "longDescription": "Uninstall applications properly and clean up what previous uninstalls left behind. Nothing is ever deleted \u2014 every removal moves to the Trash or Recycle Bin, behind a review sheet showing every path and the reason it matched. Free and open-source, by BiswasHost."
+    "longDescription": "Deskio — Organize. Clean. Simplify. Uninstall applications thoroughly, sweep developer build junk (node_modules, Cargo targets, Xcode caches), and reclaim your disk space with total safety."
   }
 }

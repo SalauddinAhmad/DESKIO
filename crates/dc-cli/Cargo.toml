@@ -1,6 +1,6 @@
 [package]
-name = "bhu-cli"
-description = "Headless CLI over the BHUninstaller engine. Used for testing on any OS."
+name = "dc-cli"
+description = "Headless CLI over the Deskio engine. Used for testing on any OS."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,9 +8,9 @@ authors.workspace = true
 repository.workspace = true
 
 [[bin]]
-name = "bhu"
+name = "deskio"
 path = "src/main.rs"
 
 [dependencies]
-bhu-core = { path = "../bhu-core" }
+dc-core = { path = "../dc-core" }
 serde_json.workspace = true
