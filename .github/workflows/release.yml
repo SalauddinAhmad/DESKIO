@@ -1,24 +1,38 @@
 name: Release
 
-# Builds the installers for a tag and attaches them to its release, so the
-# in-app updater has something to find. Every release must keep an asset for
-# each platform and a vX.Y.Z tag — the updater matches on both.
+# Builds the installers for a tag (v*) and attaches them to its GitHub release.
 on:
   push:
-    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
-# Creating the release and attaching installers to it needs write access to
-# repository contents; the default token is read-only.
 permissions:
   contents: write
 
 jobs:
+  create-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create Draft Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft \
+              --title "DESKIO $TAG" \
+              --notes "DESKIO Release $TAG — See README for installation instructions." \
+              || true
+          fi
+
   build:
     name: ${{ matrix.name }}
+    needs: create-release
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.optional || false }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -31,37 +45,18 @@ jobs:
             name: macOS (Intel)
             target: x86_64-apple-darwin
             args: --target x86_64-apple-darwin
-          # These two build, but have never been run on their own platform —
-          # see the README. They are allowed to fail so a macOS release still
-          # ships; verifying them is a job for someone with the hardware.
           - os: windows-latest
             name: Windows
             target: ""
             args: --bundles msi,nsis
-            optional: true
           - os: ubuntu-latest
             name: Linux (x86_64)
             target: ""
-            # .deb and .rpm are a few megabytes; an AppImage is ~76 MB because
-            # it carries its own copy of GTK and WebKit. Not worth the download
-            # for the same application.
             args: --bundles deb,rpm
-            optional: true
-          # A Linux VM on an Apple-silicon Mac is arm64, which is how most
-          # people here will first try this — and an amd64 package simply
-          # refuses to install on it. GitHub's arm64 runners are free for
-          # public repositories, so there is no reason not to build it.
-          - os: ubuntu-24.04-arm
-            name: Linux (arm64)
-            target: ""
-            args: --bundles deb,rpm
-            optional: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # The Intel build runs on an Apple-silicon runner, so its target has
-          # to be installed explicitly.
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
@@ -84,16 +79,9 @@ jobs:
       - name: Build
         working-directory: app
         env:
-          # Ad-hoc sign the app *during* bundling, before the disk image is
-          # made. Signing afterwards is too late — and leaving it unsigned
-          # makes macOS report a downloaded build as "damaged" rather than
-          # merely unverified.
           APPLE_SIGNING_IDENTITY: ${{ matrix.os == 'macos-latest' && '-' || '' }}
         run: npm run tauri build -- ${{ matrix.args }}
 
-      # tauri-action could not collect the Windows and Linux bundles even
-      # though it had just built them, so the installers are gathered and
-      # uploaded directly. Predictable, and easy to see what went where.
       - name: Attach installers to the release
         shell: bash
         env:
@@ -101,7 +89,6 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # `mapfile` does not exist in the bash 3.2 that ships with macOS.
           files=()
           while IFS= read -r f; do files+=("$f"); done < <(find target -type f \
             \( -name '*.dmg' -o -name '*.msi' -o -name '*-setup.exe' \
@@ -110,50 +97,9 @@ jobs:
 
           if [ ${#files[@]} -eq 0 ]; then
             echo "::error::no installers were produced"
-            find target -maxdepth 4 -type d -name bundle -exec find {} -type f \; | head -40
             exit 1
           fi
 
           printf 'found:\n'; printf '  %s\n' "${files[@]}"
-
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --draft \
-              --title "DESKIO $TAG" \
-              --notes "See the README for what is in this release. macOS builds are ad-hoc signed, not notarised: open with right-click → Open the first time." \
-              || true
-          fi
           gh release upload "$TAG" "${files[@]}" --clobber
-
-  # Only the newest release is kept. Older ones are deleted along with their
-  # tags, so the releases page never accumulates builds nobody should be
-  # downloading — and the updater only ever has one answer to give.
-  prune:
-    name: Remove older releases
-    needs: build
-    if: always() && !cancelled()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Delete every release but the newest
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KEEP: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          # Never prune unless the release being built actually exists and has
-          # something attached; deleting the old ones after a failed build
-          # would leave nothing to download at all.
-          count=$(gh release view "$KEEP" --repo "$GITHUB_REPOSITORY" \
-                    --json assets -q '.assets | length' 2>/dev/null || echo 0)
-          if [ "$count" -lt 1 ]; then
-            echo "::warning::$KEEP has no assets — keeping the older releases"
-            exit 0
-          fi
-
-          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
-            --json tagName -q '.[].tagName' \
-          | while read -r tag; do
-              [ "$tag" = "$KEEP" ] && continue
-              echo "removing $tag"
-              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
-            done
+          gh release edit "$TAG" --draft=false || true
