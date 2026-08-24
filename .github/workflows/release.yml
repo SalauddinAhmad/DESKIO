@@ -39,11 +39,20 @@ jobs:
             args: --bundles msi,nsis
             optional: true
           - os: ubuntu-latest
-            name: Linux
+            name: Linux (x86_64)
             target: ""
             # .deb and .rpm are a few megabytes; an AppImage is ~76 MB because
             # it carries its own copy of GTK and WebKit. Not worth the download
             # for the same application.
+            args: --bundles deb,rpm
+            optional: true
+          # A Linux VM on an Apple-silicon Mac is arm64, which is how most
+          # people here will first try this — and an amd64 package simply
+          # refuses to install on it. GitHub's arm64 runners are free for
+          # public repositories, so there is no reason not to build it.
+          - os: ubuntu-24.04-arm
+            name: Linux (arm64)
+            target: ""
             args: --bundles deb,rpm
             optional: true
     steps:
