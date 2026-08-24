@@ -1,7 +1,7 @@
 import React from "react";
 import { InstalledApp, OrphanGroup, JunkGroup, Section } from "../types";
 import { humanSize } from "../api";
-import { IconApps, IconBroom, IconTerminal, IconShield, IconCheck, IconWarn } from "./icons";
+import { IconApps, IconBroom, IconTerminal, IconShield, IconWarn } from "./icons";
 
 interface DashboardViewProps {
   apps: InstalledApp[];
@@ -9,7 +9,8 @@ interface DashboardViewProps {
   junk: JunkGroup[];
   fdaGranted: boolean;
   onNavigate: (section: Section) => void;
-  onRefreshAll?: () => void;
+  onQuickCleanJunk: () => void;
+  onQuickSweepOrphans: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -18,7 +19,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   junk,
   fdaGranted,
   onNavigate,
-  onRefreshAll: _onRefreshAll,
+  onQuickCleanJunk,
+  onQuickSweepOrphans,
 }) => {
   const totalAppsSize = apps.reduce((sum, a) => sum + (a.size_bytes || 0), 0);
   const totalOrphansSize = orphans.reduce((sum, o) => sum + (o.size_bytes || 0), 0);
@@ -28,138 +30,171 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const runningAppsCount = apps.filter(a => a.is_running).length;
 
   return (
-    <div className="dashboard-container">
-      {/* Header Banner */}
-      <div className="dashboard-hero">
-        <div className="hero-content">
-          <div className="hero-badge">
-            <span className="pulse-dot"></span>
-            <span>DESKIO Engine v1.0.0</span>
+    <div className="view-body">
+      {/* Top Warning Banner if FDA is missing */}
+      {!fdaGranted && (
+        <div className="top-notice-banner">
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <IconWarn />
+            <span>Full Disk Access is currently off. Some leftover files might be hidden.</span>
           </div>
-          <h1>DESKIO</h1>
-          <p>Organize. Clean. Simplify.</p>
+          <button onClick={() => onNavigate("dashboard")}>Fix Permissions</button>
+        </div>
+      )}
+
+      {/* Hero Cards Top Grid */}
+      <div className="dash-top-grid">
+        {/* Coral Storage Card */}
+        <div className="coral-hero-card">
+          <div>
+            <h4>Cleanable Space</h4>
+            <div className="hero-val">{humanSize(totalCleanable)}</div>
+            <div className="hero-sub">{orphans.length} Leftover Groups & Junk files</div>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button className="btn-secondary" style={{ color: "#ff6b4a", fontWeight: 700 }} onClick={onQuickCleanJunk}>
+              ⚡ 1-Click Clean Junk
+            </button>
+          </div>
         </div>
 
-        <div className="hero-stats-card">
-          <div className="stat-circle">
-            <svg viewBox="0 0 36 36" className="circular-chart cyan">
-              <path
-                className="circle-bg"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-              <path
-                className="circle"
-                strokeDasharray="92, 100"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-              <text x="18" y="20.35" className="percentage">92%</text>
-            </svg>
+        {/* Purple Health Card */}
+        <div className="purple-hero-card">
+          <div>
+            <h4 style={{ opacity: 0.9, fontSize: "13px" }}>System Health</h4>
+            <div className="hero-val">94%</div>
+            <div style={{ fontSize: "12px", opacity: 0.85 }}>Optimal Status</div>
           </div>
-          <div className="stat-text">
-            <span className="stat-label">System Health</span>
-            <span className="stat-value">Optimal</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+            <IconShield /> 100% Safe
+          </div>
+        </div>
+
+        {/* Overview Stats Card */}
+        <div className="dash-stats-card">
+          <div>
+            <div style={{ fontSize: "13px", color: "var(--ink-secondary)", fontWeight: 600 }}>
+              System Storage Breakdown
+            </div>
+            <div style={{ fontSize: "20px", fontWeight: 700, marginTop: "4px" }}>
+              {humanSize(totalAppsSize + totalCleanable)} Used
+            </div>
+          </div>
+
+          <div className="stat-bars-container">
+            <div className="stat-bar active" style={{ height: "75%" }}></div>
+            <div className="stat-bar active" style={{ height: "45%" }}></div>
+            <div className="stat-bar active" style={{ height: "90%" }}></div>
+            <div className="stat-bar active" style={{ height: "60%" }}></div>
+            <div className="stat-bar" style={{ height: "30%" }}></div>
           </div>
         </div>
       </div>
 
-      {/* Quick Action Grid */}
-      <div className="dashboard-grid">
-        <div className="dash-card cleanable-card">
-          <div className="card-header">
-            <div className="icon-wrapper cyan">
-              <IconBroom />
-            </div>
-            <div>
-              <h3>Reclaimable Space</h3>
-              <p className="card-sub">Leftovers & Junk files ready for cleanup</p>
-            </div>
+      {/* Quick Action Pill Grid */}
+      <div className="dash-quick-actions-row">
+        <div className="quick-action-pill" onClick={onQuickCleanJunk}>
+          <div className="action-icon coral">
+            <IconBroom />
           </div>
-          <div className="card-big-value">
-            {humanSize(totalCleanable)}
-          </div>
-          <div className="card-actions">
-            <button className="btn-primary" onClick={() => onNavigate("cleanup")}>
-              Clean Junk Files
-            </button>
-            <button className="btn-secondary" onClick={() => onNavigate("remaining")}>
-              Review Leftovers
-            </button>
+          <div className="action-info">
+            <h5>⚡ 1-Click Clean</h5>
+            <p>{humanSize(totalJunkSize)} Junk Files</p>
           </div>
         </div>
 
-        <div className="dash-card apps-summary-card">
-          <div className="card-header">
-            <div className="icon-wrapper violet">
-              <IconApps />
-            </div>
-            <div>
-              <h3>Applications</h3>
-              <p className="card-sub">{apps.length} installed applications</p>
-            </div>
+        <div className="quick-action-pill" onClick={onQuickSweepOrphans}>
+          <div className="action-icon purple">
+            <IconApps />
           </div>
-          <div className="card-big-value">
-            {humanSize(totalAppsSize)}
+          <div className="action-info">
+            <h5>🗑️ Sweep Leftovers</h5>
+            <p>{orphans.length} Leftover Groups</p>
           </div>
-          <div className="meta-row">
-            <span className="meta-badge">{runningAppsCount} Running Apps</span>
-            <span className="meta-badge">{orphans.length} Leftover Groups</span>
+        </div>
+
+        <div className="quick-action-pill" onClick={() => onNavigate("dev_clean")}>
+          <div className="action-icon emerald">
+            <IconTerminal />
           </div>
-          <div className="card-actions">
+          <div className="action-info">
+            <h5>💻 Dev Caches</h5>
+            <p>node_modules & Build</p>
+          </div>
+        </div>
+
+        <div className="quick-action-pill" onClick={() => onNavigate("applications")}>
+          <div className="action-icon cyan">
+            <IconApps />
+          </div>
+          <div className="action-info">
+            <h5>🚀 Manage Apps</h5>
+            <p>{apps.length} Installed Apps</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Table & Quick Overview */}
+      <div className="dash-bottom-grid">
+        <div className="list-table-card">
+          <div className="table-header">
+            <h3>Recent Installed Applications</h3>
             <button className="btn-secondary" onClick={() => onNavigate("applications")}>
-              Manage Applications
+              View All Apps ({apps.length})
             </button>
           </div>
+
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {apps.slice(0, 5).map((app) => (
+              <div key={app.id} className="clean-table-row">
+                <div className="row-left">
+                  <div className="row-icon">
+                    {app.icon_png_base64 ? (
+                      <img src={`data:image/png;base64,${app.icon_png_base64}`} alt="" style={{ width: 22, height: 22 }} />
+                    ) : (
+                      <IconApps />
+                    )}
+                  </div>
+                  <div>
+                    <div className="row-title">{app.name}</div>
+                    <div className="row-sub">{app.bundle_id || app.publisher || "Application"}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                  <div className="row-val">{humanSize(app.size_bytes)}</div>
+                  <button className="btn-secondary" onClick={() => onNavigate("applications")}>
+                    Uninstall
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="dash-card dev-summary-card">
-          <div className="card-header">
-            <div className="icon-wrapper emerald">
-              <IconTerminal />
+        <div className="list-table-card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div>
+            <div className="table-header">
+              <h3>Quick Summary</h3>
             </div>
-            <div>
-              <h3>Developer Caches</h3>
-              <p className="card-sub">node_modules, Cargo targets & build junk</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "13px", color: "var(--ink-secondary)" }}>Running Apps</span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#6366f1" }}>{runningAppsCount}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "13px", color: "var(--ink-secondary)" }}>Leftover Folders</span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#ff6b4a" }}>{orphans.length}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "13px", color: "var(--ink-secondary)" }}>Trash Safety</span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: "#10b981" }}>100% Active</span>
+              </div>
             </div>
           </div>
-          <div className="card-big-value">
-            {humanSize(totalJunkSize)}
-          </div>
-          <div className="card-actions">
-            <button className="btn-secondary" onClick={() => onNavigate("dev_clean")}>
-              Scan Dev Build Cache
-            </button>
-          </div>
-        </div>
-      </div>
 
-      {/* Safety & System Status */}
-      <div className="dash-status-row">
-        <div className={`status-pill ${fdaGranted ? "granted" : "warning"}`}>
-          <div className="pill-icon">
-            {fdaGranted ? <IconCheck /> : <IconWarn />}
-          </div>
-          <div className="pill-info">
-            <span className="pill-title">
-              Full Disk Access: {fdaGranted ? "Granted" : "Limited Access"}
-            </span>
-            <span className="pill-desc">
-              {fdaGranted
-                ? "DESKIO has full permissions to perform deep leftover sweeps."
-                : "Grant access in System Settings for complete leftover detection."}
-            </span>
-          </div>
-        </div>
-
-        <div className="status-pill safe">
-          <div className="pill-icon">
-            <IconShield />
-          </div>
-          <div className="pill-info">
-            <span className="pill-title">100% Reversible Trash Safety</span>
-            <span className="pill-desc">
-              Every item is moved to system Trash before deletion. Restore anytime.
-            </span>
-          </div>
+          <button className="btn-coral" style={{ marginTop: "20px", width: "100%", justifyContent: "center" }} onClick={onQuickCleanJunk}>
+            ⚡ 1-Click Clean Everything
+          </button>
         </div>
       </div>
     </div>

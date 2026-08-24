@@ -76,17 +76,9 @@ export default function App() {
   const [report, setReport] = useState<RemovalReport | null>(null);
 
   useEffect(() => {
-    // The permission explanation appears once, on first launch, and only when
-    // something is actually being withheld.
     Promise.all([api.accessReport(), api.getSettings()]).then(([report, saved]) => {
       setAccess(report);
       setSettings(saved);
-      if (report.applicable && !report.granted && !saved.full_disk_prompt_seen) {
-        setShowAccess(true);
-        const seen = { ...saved, full_disk_prompt_seen: true };
-        setSettings(seen);
-        api.setSettings(seen);
-      }
     });
     // Honours the setting and the once-a-day throttle; silent when it fails.
     api.checkAppUpdate(false).then((result) => {
@@ -96,9 +88,6 @@ export default function App() {
     api.listApps().then((a) => {
       setApps(a);
       setLoading(false);
-      // Icons cost a subprocess each, so they are fetched after the list is on
-      // screen — and only once it is, since the engine reads them from the
-      // scan it has just cached.
       api.appIcons().then(setIcons);
     });
   }, []);
@@ -335,6 +324,7 @@ export default function App() {
   return (
     <div className="shell">
       <nav className="rail" data-tauri-drag-region>
+        <div className="rail-brand-icon">D</div>
         <RailItem
           label="Overview"
           active={section === "dashboard"}
@@ -397,103 +387,126 @@ export default function App() {
             icon={<IconSettings />}
           />
         </div>
-        <div className="rail-brand" style={{ marginTop: 10 }}>
+        <div className="rail-brand-text">
           DESKIO
           <span>v{version}</span>
         </div>
       </nav>
 
-      {section === "dashboard" && (
-        <DashboardView
-          apps={apps}
-          orphans={orphans}
-          junk={junk}
-          fdaGranted={access.granted}
-          onNavigate={(s) => setSection(s)}
-          onRefreshAll={() => {
-            api.listApps(true).then(setApps);
-            api.orphanGroups(true).then(setOrphans);
-            api.junkGroups(true).then(setJunk);
-          }}
-        />
-      )}
-      {section === "applications" && (
-        <AppsView
-          apps={apps}
-          icons={icons}
-          banner={banner}
-          loading={loading}
-          removalNonce={removalNonce}
-          onUninstall={openPlanFor}
-        />
-      )}
-      {section === "dev_clean" && (
-        <DevCleanView
-          junk={junk}
-          onCleanDevJunk={openCleanupPlan}
-        />
-      )}
-      {section === "startup" && (
-        <StartupView
-          items={startup}
-          banner={banner}
-          loading={startupLoading}
-          busyId={startupBusyId}
-          error={startupError}
-          onToggle={toggleStartup}
-        />
-      )}
-      {section === "extensions" && (
-        <ExtensionsView
-          groups={extensions}
-          banner={banner}
-          loading={extensionsLoading}
-          onRemove={openExtensionPlan}
-        />
-      )}
-      {section === "cleanup" && (
-        <CleanupView
-          groups={junk}
-          banner={banner}
-          loading={junkLoading}
-          onClean={openCleanupPlan}
-        />
-      )}
-      {section === "updates" && (
-        <UpdatesView
-          updates={updates}
-          banner={banner}
-          loading={updatesLoading}
-          checkedApps={Math.max(0, apps.length - updates.length)}
-          onRecheck={() => loadUpdates(true)}
-        />
-      )}
-      {section === "history" && (
-        <HistoryView
-          entries={history}
-          loading={historyLoading}
-          busyId={restoreBusyId}
-          result={restoreResult}
-          onRestore={restore}
-        />
-      )}
-      {section === "remaining" && (
-        <RemainingView
-          groups={orphans}
-          banner={banner}
-          loading={scanningOrphans}
-          onRemove={openOrphanPlan}
-        />
-      )}
+      <main className="main-workspace">
+        <header className="top-header">
+          <div className="header-welcome">
+            <h1>Welcome To DESKIO Dashboard</h1>
+            <p>Organize. Clean. Simplify.</p>
+          </div>
 
-      <label className="toggle" style={{ position: "fixed", top: 16, right: 22 }}>
-        <input
-          type="checkbox"
-          checked={expert}
-          onChange={(e) => setExpert(e.target.checked)}
-        />
-        Expert Mode
-      </label>
+          <div className="header-right">
+            <label className="toggle" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+              <input
+                type="checkbox"
+                checked={expert}
+                onChange={(e) => setExpert(e.target.checked)}
+              />
+              Expert Mode
+            </label>
+            <button className="header-icon-btn" onClick={() => setShowSettings(true)}>
+              <IconSettings />
+            </button>
+          </div>
+        </header>
+
+        {section === "dashboard" && (
+          <DashboardView
+            apps={apps}
+            orphans={orphans}
+            junk={junk}
+            fdaGranted={access.granted}
+            onNavigate={(s) => {
+              if (s === "dashboard" && !access.granted) {
+                setShowAccess(true);
+              } else {
+                setSection(s);
+              }
+            }}
+            onQuickCleanJunk={() => {
+              const ids = junk.filter(j => j.removable).flatMap(j => j.items.map(i => i.id));
+              if (ids.length > 0) openCleanupPlan(ids);
+            }}
+            onQuickSweepOrphans={() => {
+              const names = orphans.map(o => o.name);
+              if (names.length > 0) openOrphanPlan(names);
+            }}
+          />
+        )}
+        {section === "applications" && (
+          <AppsView
+            apps={apps}
+            icons={icons}
+            banner={banner}
+            loading={loading}
+            removalNonce={removalNonce}
+            onUninstall={openPlanFor}
+          />
+        )}
+        {section === "dev_clean" && (
+          <DevCleanView
+            junk={junk}
+            onCleanDevJunk={openCleanupPlan}
+          />
+        )}
+        {section === "startup" && (
+          <StartupView
+            items={startup}
+            banner={banner}
+            loading={startupLoading}
+            busyId={startupBusyId}
+            error={startupError}
+            onToggle={toggleStartup}
+          />
+        )}
+        {section === "extensions" && (
+          <ExtensionsView
+            groups={extensions}
+            banner={banner}
+            loading={extensionsLoading}
+            onRemove={openExtensionPlan}
+          />
+        )}
+        {section === "cleanup" && (
+          <CleanupView
+            groups={junk}
+            banner={banner}
+            loading={junkLoading}
+            onClean={openCleanupPlan}
+          />
+        )}
+        {section === "updates" && (
+          <UpdatesView
+            updates={updates}
+            banner={banner}
+            loading={updatesLoading}
+            checkedApps={Math.max(0, apps.length - updates.length)}
+            onRecheck={() => loadUpdates(true)}
+          />
+        )}
+        {section === "history" && (
+          <HistoryView
+            entries={history}
+            loading={historyLoading}
+            busyId={restoreBusyId}
+            result={restoreResult}
+            onRestore={restore}
+          />
+        )}
+        {section === "remaining" && (
+          <RemainingView
+            groups={orphans}
+            banner={banner}
+            loading={scanningOrphans}
+            onRemove={openOrphanPlan}
+          />
+        )}
+      </main>
 
       {appUpdate?.update && (
         <AppUpdateSheet check={appUpdate} onClose={() => setAppUpdate(null)} />
