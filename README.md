@@ -4,6 +4,18 @@ A native cross-platform application uninstaller, developer cache sweeper, and wo
 
 ---
 
+## 📥 Download DESKIO Latest Release
+
+Click your platform button below to download the latest installer from GitHub Releases:
+
+[![Download for macOS](https://img.shields.io/badge/Download-macOS%20(.dmg)-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/SalauddinAhmad/DESKIO/releases/latest)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows%20(.msi)-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/SalauddinAhmad/DESKIO/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux%20(.deb%2F.rpm)-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/SalauddinAhmad/DESKIO/releases/latest)
+
+> 💡 Or visit the [**GitHub Releases Page**](https://github.com/SalauddinAhmad/DESKIO/releases/latest) to choose all available build formats.
+
+---
+
 ## ✨ Features & Highlights
 
 - 🚀 **Complete Application Uninstaller**: Detects every installed app along with its leftover support files, caches, containers, launch agents, and preferences.
