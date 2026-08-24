@@ -1,5 +1,5 @@
 /** Inline SVGs — no icon font, so the app stays self-contained and offline. */
-const s = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+const s = { width: 24, height: 24, fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
 export const IconApps = () => (
   <svg viewBox="0 0 24 24" {...s}><rect x="3" y="3" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="2" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="2" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2" /></svg>
@@ -71,7 +71,7 @@ export const IconShield = () => (
 
 /** The illustration on empty right-hand panes. */
 export const ArtEmpty = () => (
-  <svg viewBox="0 0 120 120" className="empty-art" {...s} strokeWidth={2.2}>
+  <svg viewBox="0 0 120 120" className="empty-art" {...s} width={80} height={80} strokeWidth={2.2}>
     <rect x="30" y="18" width="60" height="44" rx="10" />
     <path d="M36 78h48M44 92h32M52 106h16" strokeOpacity=".6" />
   </svg>
